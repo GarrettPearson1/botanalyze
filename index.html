@@ -8,19 +8,18 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
         tailwind.config = {
-            darkMode: 'class', // Enables toggleable dark mode
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        first: '#0066b3', // FIRST Blue
-                        firstRed: '#ed1c24', // FIRST Red
+                        first: '#0066b3', 
+                        firstRed: '#ed1c24', 
                     }
                 }
             }
         }
     </script>
     <script>
-        // Check local storage / system preference before rendering to prevent flash of wrong theme
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         } else {
@@ -28,20 +27,14 @@
         }
     </script>
     <style>
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        
-        /* Dark Mode Scrollbar */
         html.dark ::-webkit-scrollbar-track { background: #0f172a; }
         html.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
-        
-        /* Light Mode Scrollbar */
         html:not(.dark) ::-webkit-scrollbar-track { background: #f8fafc; }
         html:not(.dark) ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Loader */
         .loader {
             border: 3px solid #e2e8f0;
             border-bottom-color: #3b82f6;
@@ -61,11 +54,14 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Compare Mode Toggle Styles */
+        .compare-col { display: none; }
+        .compare-mode-active .compare-col { display: table-cell; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-slate-950 text-gray-700 dark:text-slate-300 font-sans min-h-screen flex flex-col transition-colors duration-300">
 
-    <!-- Navbar -->
     <nav class="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 transition-colors duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 sm:h-20">
@@ -75,19 +71,13 @@
                 </div>
                 <div class="flex items-center gap-2 sm:gap-4">
                     <button id="theme-btn" onclick="toggleTheme()" class="p-2 sm:p-3 rounded-full transition-colors text-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12">
-                        <!-- Icon injected by JS -->
-                    </button>
-                    <button id="load-my-team-btn" onclick="loadMyTeam()" class="hidden text-base bg-blue-100 dark:bg-blue-600/20 hover:bg-blue-200 dark:hover:bg-blue-600/40 text-blue-700 dark:text-blue-400 font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-md transition-colors border border-blue-200 dark:border-blue-800/50 flex items-center gap-2">
-                        <i class="fa-solid fa-star"></i> <span class="hidden sm:inline" id="my-team-label">My Team</span>
                     </button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="flex-grow flex flex-col">
-        <!-- Search Section & Leaderboard -->
         <div class="w-full bg-white dark:bg-slate-900 py-16 sm:py-24 border-b border-gray-200 dark:border-slate-800 transition-all duration-500" id="search-container">
             <div class="max-w-5xl mx-auto px-4 text-center">
                 <h1 class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 transition-colors" id="hero-title">Analyze FRC Team Performance</h1>
@@ -103,62 +93,53 @@
                     </div>
                     
                     <select id="year-select" class="w-full sm:w-auto block pl-4 pr-10 py-4 border border-gray-300 dark:border-slate-700 rounded-lg text-lg leading-5 bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-                        <!-- Populated by JS -->
-                    </select>
+                        </select>
 
                     <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 px-8 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
                         <i class="fa-solid fa-magnifying-glass"></i> Analyze
                     </button>
                 </form>
 
-                <!-- Dynamic Leaderboard -->
-                <div id="leaderboard-section" class="fade-in max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-md dark:shadow-lg overflow-hidden transition-colors duration-300 text-left">
+                <!-- Team Tracker Feed -->
+                <div id="team-tracker-section" class="fade-in max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-md dark:shadow-lg overflow-hidden transition-colors duration-300 text-left">
                     <div class="bg-gray-50 dark:bg-slate-900 px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors duration-300">
                         <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <i class="fa-solid fa-fire text-orange-500"></i> Analyzed Leaderboard
+                            <i class="fa-solid fa-list-check text-blue-500"></i> My Team Tracker
                         </h3>
                         
-                        <!-- Leaderboard Filters & Controls -->
-                        <div class="flex items-center gap-3 w-full sm:w-auto">
-                            <div class="relative w-full sm:w-auto">
-                                <i class="fa-solid fa-filter absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 text-sm"></i>
-                                <select id="lb-state-filter" onchange="renderLeaderboard()" class="w-full sm:w-auto pl-8 pr-8 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors appearance-none">
-                                    <option value="All">All Regions</option>
-                                    <!-- Options injected via JS -->
-                                </select>
-                            </div>
-                            <div class="relative w-full sm:w-auto">
-                                <select id="lb-limit" onchange="renderLeaderboard()" class="w-full sm:w-auto pl-3 pr-8 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors appearance-none">
-                                    <option value="10">Top 10</option>
-                                    <option value="25">Top 25</option>
-                                    <option value="50">Top 50</option>
-                                    <option value="All">View All</option>
-                                </select>
-                            </div>
+                        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                            <!-- Cancel Compare Button (Hidden by default) -->
+                            <button id="cancel-compare-btn" onclick="cancelCompareMode()" class="hidden w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-bold transition-colors shadow-sm">
+                                Cancel
+                            </button>
+
+                            <!-- Compare Button -->
+                            <button id="compare-btn" onclick="handleCompareBtnClick()" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-code-compare"></i> <span id="compare-btn-text">Compare</span>
+                            </button>
+
+                            <span id="tracker-error" class="hidden text-xs font-bold transition-colors"></span>
+                            <form id="tracker-add-form" onsubmit="handleAddTrackedTeam(event)" class="flex items-center gap-2 w-full sm:w-auto">
+                                <input type="number" id="tracker-add-input" placeholder="Team #" required min="1" class="w-full sm:w-28 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-bold transition-colors shadow-sm">Add</button>
+                            </form>
                         </div>
                     </div>
                     
                     <div class="overflow-x-auto max-h-[500px] overflow-y-auto relative">
-                        <table class="w-full text-left border-collapse min-w-[600px]">
+                        <table id="tracker-table" class="w-full text-left border-collapse min-w-[600px]">
                             <thead class="sticky top-0 z-10 bg-white dark:bg-slate-800 shadow-sm border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
                                 <tr class="text-xs sm:text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-                                    <th class="px-4 sm:px-6 py-3 font-semibold w-16">Rank</th>
-                                    <th class="px-4 sm:px-6 py-3 font-semibold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('teamNum')">
-                                        Team <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
-                                    </th>
-                                    <th class="px-4 sm:px-6 py-3 font-semibold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('state')">
-                                        Region <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
-                                    </th>
-                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('wins')">
-                                        Record <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
-                                    </th>
-                                    <th class="px-4 sm:px-6 py-3 font-semibold text-right cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('winRate')">
-                                        Win % <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
-                                    </th>
+                                    <th class="px-4 py-3 font-semibold w-10 text-center compare-col"><i class="fa-solid fa-check-double"></i></th>
+                                    <th class="px-2 sm:px-6 py-3 font-semibold w-24">Team</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold">Name</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center">Record</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center">Win %</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="leaderboard-body" class="divide-y divide-gray-100 dark:divide-slate-800 transition-colors duration-300">
-                                <!-- Leaderboard rows injected here -->
+                            <tbody id="tracker-body" class="divide-y divide-gray-100 dark:divide-slate-800 transition-colors duration-300">
+                                <!-- Tracker rows injected here -->
                             </tbody>
                         </table>
                     </div>
@@ -170,22 +151,18 @@
         <!-- Dashboard Section (Hidden by default) -->
         <div id="dashboard" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
             
-            <!-- Loading State -->
             <div id="loading-state" class="hidden flex-col items-center justify-center py-20">
                 <span class="loader w-16 h-16 mb-6"></span>
                 <p class="text-lg text-gray-500 dark:text-slate-400 animate-pulse">Fetching data from The Blue Alliance...</p>
             </div>
 
-            <!-- Error Message -->
             <div id="error-message" class="hidden bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-6 py-4 rounded-lg relative mb-6 text-lg transition-colors" role="alert">
                 <strong class="font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Error:</strong>
                 <span class="block sm:inline" id="error-text">Something went wrong.</span>
             </div>
 
-            <!-- Data Content -->
             <div id="data-content" class="hidden fade-in space-y-8">
                 
-                <!-- Team Header Card -->
                 <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-md dark:shadow-lg relative transition-colors duration-300">
                     <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-600"></div>
                     <div class="p-6 sm:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -193,7 +170,7 @@
                             <div class="flex items-center gap-4 mb-3">
                                 <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white transition-colors">Team <span id="display-team-num"></span></h2>
                                 <span id="team-rookie-year" class="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-slate-900 text-sm font-bold text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 transition-colors"></span>
-                                <button onclick="saveMyTeam()" class="ml-2 text-gray-400 dark:text-slate-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors" title="Save as My Team">
+                                <button id="team-star-btn" onclick="toggleCurrentTeamTracker()" class="ml-2 text-gray-400 dark:text-slate-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors" title="Toggle Tracker">
                                     <i class="fa-solid fa-star text-2xl" id="star-icon"></i>
                                 </button>
                             </div>
@@ -210,10 +187,8 @@
                     </div>
                 </div>
 
-                <!-- Main Grid -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
-                    <!-- Events List (Takes up 2 columns on large screens) -->
                     <div class="lg:col-span-2 space-y-6">
                         <div class="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 pb-2 transition-colors">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 transition-colors">
@@ -223,13 +198,10 @@
                         </div>
                         
                         <div id="events-container" class="space-y-4">
-                            <!-- Events injected here -->
-                        </div>
+                            </div>
                     </div>
 
-                    <!-- Sidebar Stats / Robot Info -->
                     <div class="space-y-8">
-                        <!-- Quick Stats -->
                         <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 sm:p-8 shadow-md dark:shadow-lg transition-colors duration-300">
                             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6 border-b border-gray-200 dark:border-slate-700 pb-3 transition-colors">Season Summary</h3>
                             <div class="grid grid-cols-2 gap-4">
@@ -248,7 +220,6 @@
                             </div>
                         </div>
 
-                        <!-- Info Box -->
                         <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 sm:p-8 shadow-md dark:shadow-lg transition-colors duration-300">
                             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-slate-700 pb-3 transition-colors">About The Data</h3>
                             <p class="text-base text-gray-600 dark:text-slate-400 mb-6 leading-relaxed transition-colors">
@@ -274,13 +245,26 @@
                     <p class="text-base sm:text-lg text-gray-500 dark:text-slate-400 mt-2 transition-colors" id="event-page-subtitle"></p>
                 </div>
                 <div class="p-0 sm:p-8" id="event-page-body">
-                    <!-- Matches injected here -->
-                </div>
+                    </div>
+            </div>
+        </div>
+
+        <!-- Head-to-Head Compare Page (Hidden by default) -->
+        <div id="compare-page" class="hidden max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow fade-in">
+            <button onclick="resetToHome()" class="mb-6 sm:mb-8 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-lg font-medium">
+                <i class="fa-solid fa-arrow-left"></i> Back to Tracker
+            </button>
+            <div class="mb-6 border-b border-gray-200 dark:border-slate-700 pb-4">
+                <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <i class="fa-solid fa-code-compare text-purple-500"></i> Head-to-Head Comparison (<span id="compare-year-label"></span>)
+                </h2>
+            </div>
+            <div id="compare-page-body" class="w-full">
+                <!-- Comparison Grid injected here -->
             </div>
         </div>
     </main>
 
-    <!-- Team Quick Stats Popup Modal -->
     <div id="team-stat-modal" class="fixed inset-0 bg-gray-900/50 dark:bg-black/70 backdrop-blur-sm hidden z-[110] flex items-center justify-center px-4 opacity-0 transition-opacity duration-300" onclick="closeTeamStats(event)">
         <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-all duration-300" onclick="event.stopPropagation()">
             <div class="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900 rounded-t-xl transition-colors">
@@ -313,23 +297,15 @@
     <script>
         // State
         const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
-        const apiKey = 'oNOtsAHcwgn37Zq7Ym8d6FUes8G9fybLUAQFtFI2JdBEoLgSWnHarwJjwZdH0UVu'; // Replace this with your actual key!
+        const apiKey = 'oNOtsAHcwgn37Zq7Ym8d6FUes8G9fybLUAQFtFI2JdBEoLgSWnHarwJjwZdH0UVu'; 
         let currentTeamNum = null;
-        let eventStats = {}; // To store averages and chronological history for all teams
-        let eventRankings = []; // To store RP data
+        let eventStats = {}; 
+        let eventRankings = []; 
+        let currentTeamNameStr = '';
         
-        // Leaderboard State
-        let lbSortCol = 'winRate';
-        let lbSortDesc = true;
-
-        // Default Leaderboard - Hall of Fame Teams to seed the UI
-        const defaultLeaderboard = [
-            { teamNum: 254, name: 'The Cheesy Poofs', state: 'California', wins: 53, losses: 3, ties: 1, winRate: 93 },
-            { teamNum: 1678, name: 'Citrus Circuits', state: 'California', wins: 58, losses: 6, ties: 0, winRate: 91 },
-            { teamNum: 2056, name: 'OP Robotics', state: 'Ontario', wins: 50, losses: 5, ties: 0, winRate: 91 },
-            { teamNum: 1323, name: 'MadTown Robotics', state: 'California', wins: 45, losses: 8, ties: 0, winRate: 85 },
-            { teamNum: 118, name: 'Robonauts', state: 'Texas', wins: 42, losses: 12, ties: 1, winRate: 76 }
-        ];
+        // Compare State
+        let isCompareMode = false;
+        let selectedForCompare = [];
         
         // DOM Elements
         const searchForm = document.getElementById('search-form');
@@ -339,16 +315,27 @@
         const searchContainer = document.getElementById('search-container');
         const dashboard = document.getElementById('dashboard');
         const eventPage = document.getElementById('event-page');
+        const comparePage = document.getElementById('compare-page');
         const loadingState = document.getElementById('loading-state');
         const errorMessage = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
         const dataContent = document.getElementById('data-content');
         
+        // --- Safe Storage Fetcher ---
+        function getTrackedTeams() {
+            try {
+                const data = JSON.parse(localStorage.getItem('botanalyze_tracked_teams'));
+                return Array.isArray(data) ? data : [];
+            } catch(e) {
+                console.warn("Resetting corrupted tracked teams data.");
+                return [];
+            }
+        }
+
         // Initialize
         function init() {
-            updateThemeIcon(); // Set initial theme icon
+            updateThemeIcon();
 
-            // Populate years (1992 to current year)
             const currentYear = new Date().getFullYear();
             for (let y = currentYear; y >= 1992; y--) {
                 const option = document.createElement('option');
@@ -357,22 +344,18 @@
                 yearSelect.appendChild(option);
             }
 
-            // Check for saved team
-            const savedTeam = localStorage.getItem('botanalyze_my_team');
-            if (savedTeam) {
-                const btn = document.getElementById('load-my-team-btn');
-                document.getElementById('my-team-label').textContent = `Load ${savedTeam}`;
-                btn.classList.remove('hidden');
-            }
+            loadTracker(yearSelect.value);
 
-            // Render Leaderboard
-            renderLeaderboard();
+            yearSelect.addEventListener('change', () => {
+                if (!document.getElementById('team-tracker-section').classList.contains('hidden')) {
+                    loadTracker(yearSelect.value);
+                }
+            });
 
-            // Event Listeners
             searchForm.addEventListener('submit', handleSearch);
         }
 
-        // Theme Toggle Logic
+        // Theme Toggle
         function toggleTheme() {
             const doc = document.documentElement;
             if (doc.classList.contains('dark')) {
@@ -395,167 +378,380 @@
             }
         }
 
-        // Home Button Logic
         function resetToHome() {
             searchContainer.classList.remove('hidden');
             searchContainer.classList.remove('py-6');
             searchContainer.classList.add('py-16', 'sm:py-24');
             document.getElementById('hero-title').classList.remove('hidden');
             document.getElementById('hero-subtitle').classList.remove('hidden');
-            document.getElementById('leaderboard-section').classList.remove('hidden');
+            document.getElementById('team-tracker-section').classList.remove('hidden');
             
             dashboard.classList.add('hidden');
             eventPage.classList.add('hidden');
+            comparePage.classList.add('hidden');
             teamInput.value = '';
             
             window.scrollTo(0, 0);
-            renderLeaderboard(); // refresh just in case
+            cancelCompareMode(); 
+            loadTracker(yearSelect.value); 
         }
 
-        // Leaderboard Logic
-        function sortLeaderboard(col) {
-            if (lbSortCol === col) {
-                lbSortDesc = !lbSortDesc; // Toggle sort direction
+        // --- Compare Mode Logic ---
+        function handleCompareBtnClick() {
+            if (!isCompareMode) {
+                // Enter compare mode
+                isCompareMode = true;
+                selectedForCompare = [];
+                document.getElementById('tracker-table').classList.add('compare-mode-active');
+                document.getElementById('cancel-compare-btn').classList.remove('hidden');
+                updateCompareButton();
+                loadTracker(yearSelect.value); // Re-render to reset visual state
             } else {
-                lbSortCol = col;
-                lbSortDesc = (col === 'winRate' || col === 'wins'); // Default descending for stats, asc for names
+                // Execute comparison
+                executeCompare();
             }
-            renderLeaderboard();
         }
 
-        function updateLeaderboard(teamNum, name, wins, losses, ties, winRate, state) {
-            let lb = JSON.parse(localStorage.getItem('botanalyze_leaderboard')) || defaultLeaderboard;
+        function cancelCompareMode() {
+            isCompareMode = false;
+            selectedForCompare = [];
+            const table = document.getElementById('tracker-table');
+            if(table) table.classList.remove('compare-mode-active');
             
-            // Format state safely
-            let formattedState = state || 'Unknown';
+            const cancelBtn = document.getElementById('cancel-compare-btn');
+            if(cancelBtn) cancelBtn.classList.add('hidden');
             
-            // Remove existing entry for this team if it exists
-            lb = lb.filter(t => t.teamNum !== Number(teamNum));
-            // Add new entry
-            lb.push({ teamNum: Number(teamNum), name, state: formattedState, wins, losses, ties, winRate });
-            
-            // Sort by win rate initially
-            lb.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
-            // Increased to store Top 200 locally
-            lb = lb.slice(0, 200);
-            
-            localStorage.setItem('botanalyze_leaderboard', JSON.stringify(lb));
-            renderLeaderboard();
+            updateCompareButton();
+            // Re-render to reset checkboxes if viewing the tracker
+            if (!document.getElementById('team-tracker-section').classList.contains('hidden')) {
+                loadTracker(yearSelect.value);
+            }
         }
 
-        function renderLeaderboard() {
-            let lb = JSON.parse(localStorage.getItem('botanalyze_leaderboard')) || defaultLeaderboard;
-            const container = document.getElementById('leaderboard-body');
-            const stateSelect = document.getElementById('lb-state-filter');
-            const limitSelect = document.getElementById('lb-limit');
-            
-            if(!container || !stateSelect || !limitSelect) return;
-            
-            // 1. Maintain State Dropdown Options
-            const currentStateSelection = stateSelect.value;
-            const states = [...new Set(lb.map(t => t.state).filter(Boolean))].sort();
-            
-            stateSelect.innerHTML = '<option value="All">All Regions</option>';
-            states.forEach(s => {
-                const selected = (s === currentStateSelection) ? 'selected' : '';
-                stateSelect.innerHTML += `<option value="${s}" ${selected}>${s}</option>`;
-            });
-
-            // 2. Filter by State
-            if (stateSelect.value !== 'All') {
-                lb = lb.filter(t => t.state === stateSelect.value);
+        function toggleCompareSelection(e, teamNum) {
+            e.stopPropagation(); 
+            if (e.target.checked) {
+                if (selectedForCompare.length >= 2) {
+                    e.target.checked = false; // Block if 2 are already selected
+                    return;
+                }
+                selectedForCompare.push(teamNum);
+            } else {
+                selectedForCompare = selectedForCompare.filter(n => n !== teamNum);
             }
+            updateCompareButton();
+        }
 
-            // 3. Sort Data
-            lb.sort((a, b) => {
-                let valA = a[lbSortCol];
-                let valB = b[lbSortCol];
-                
-                if (typeof valA === 'string') valA = valA.toLowerCase();
-                if (typeof valB === 'string') valB = valB.toLowerCase();
+        function updateCompareButton() {
+            const btn = document.getElementById('compare-btn');
+            const btnText = document.getElementById('compare-btn-text');
+            
+            if (!btn || !btnText) return;
 
-                if (valA < valB) return lbSortDesc ? 1 : -1;
-                if (valA > valB) return lbSortDesc ? -1 : 1;
-                
-                // Tie breaker: if sorting by Win Rate, use total wins
-                if (lbSortCol === 'winRate') return lbSortDesc ? (b.wins - a.wins) : (a.wins - b.wins);
-                return 0;
-            });
-
-            // 4. Limit Rows
-            if (limitSelect.value !== 'All') {
-                lb = lb.slice(0, parseInt(limitSelect.value));
+            if (!isCompareMode) {
+                btnText.textContent = "Compare";
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.disabled = false;
+            } else {
+                btnText.textContent = `Run Compare (${selectedForCompare.length}/2)`;
+                if (selectedForCompare.length === 2) {
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.disabled = false;
+                } else {
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btn.disabled = true;
+                }
             }
+        }
 
-            // 5. Render HTML
-            container.innerHTML = '';
-            if (lb.length === 0) {
-                container.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-slate-400">No teams found matching this filter.</td></tr>`;
+        function handleTrackerRowClick(teamNum) {
+            if (isCompareMode) {
+                // In compare mode, clicking anywhere on the row toggles the checkbox
+                const cb = document.getElementById(`cb-${teamNum}`);
+                if (cb) {
+                    cb.checked = !cb.checked;
+                    toggleCompareSelection({ target: cb, stopPropagation: () => {} }, teamNum);
+                }
+            } else {
+                // Normal mode: jump straight to team analysis
+                quickSearch(teamNum);
+            }
+        }
+
+        async function executeCompare() {
+            if (selectedForCompare.length !== 2) return;
+            const team1 = selectedForCompare[0];
+            const team2 = selectedForCompare[1];
+            const year = yearSelect.value;
+
+            searchContainer.classList.remove('py-16', 'sm:py-24');
+            searchContainer.classList.add('py-6');
+            document.getElementById('hero-title').classList.add('hidden');
+            document.getElementById('hero-subtitle').classList.add('hidden');
+            document.getElementById('team-tracker-section').classList.add('hidden');
+            
+            dashboard.classList.add('hidden');
+            eventPage.classList.add('hidden');
+            comparePage.classList.remove('hidden');
+            window.scrollTo(0, 0);
+
+            document.getElementById('compare-year-label').textContent = year;
+            const compareBody = document.getElementById('compare-page-body');
+            compareBody.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-20">
+                    <span class="loader w-14 h-14 mb-6"></span>
+                    <p class="text-lg text-gray-500 dark:text-slate-400 animate-pulse text-center px-4">Aggregating comparison data...</p>
+                </div>
+            `;
+
+            try {
+                const [t1Info, t2Info, t1Events, t2Events] = await Promise.all([
+                    fetchTBA(`/team/frc${team1}`),
+                    fetchTBA(`/team/frc${team2}`),
+                    fetchTBA(`/team/frc${team1}/events/${year}`),
+                    fetchTBA(`/team/frc${team2}/events/${year}`)
+                ]);
+
+                const t1Stats = await getAggregatedSeasonStats(team1, t1Events);
+                const t2Stats = await getAggregatedSeasonStats(team2, t2Events);
+
+                renderCompareUI(t1Info, t1Stats, t2Info, t2Stats, compareBody);
+
+            } catch(e) {
+                compareBody.innerHTML = `
+                    <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-6 py-4 rounded-lg text-center text-lg transition-colors">
+                        <i class="fa-solid fa-circle-exclamation mr-2"></i> Error loading comparison data: ${e.message}
+                    </div>`;
+            }
+        }
+
+        async function getAggregatedSeasonStats(teamNum, events) {
+            let w = 0, l = 0, t = 0;
+            const promises = events.map(async (event) => {
+                try {
+                    const status = await fetchTBA(`/team/frc${teamNum}/event/${event.key}/status`);
+                    if (status && status.qual && status.qual.ranking && status.qual.ranking.record) {
+                        return status.qual.ranking.record;
+                    }
+                } catch(err) { }
+                return null;
+            });
+            const records = await Promise.all(promises);
+            let validEvents = 0;
+            records.forEach(r => {
+                if(r) { w += r.wins; l += r.losses; t += r.ties; validEvents++; }
+            });
+            const totalMatches = w + l + t;
+            const winRate = totalMatches > 0 ? Math.round((w / totalMatches) * 100) : 0;
+            return { w, l, t, winRate, totalMatches, validEvents };
+        }
+
+        function renderCompareUI(t1Info, t1Stats, t2Info, t2Stats, container) {
+            const buildRow = (label, val1, val2, isHigherBetter = false, raw1 = null, raw2 = null) => {
+                let color1 = 'text-gray-900 dark:text-white font-medium';
+                let color2 = 'text-gray-900 dark:text-white font-medium';
+                
+                if (isHigherBetter && raw1 !== null && raw2 !== null) {
+                    if (raw1 > raw2) {
+                        color1 = 'text-green-600 dark:text-green-400 font-black';
+                        color2 = 'text-gray-500 dark:text-slate-400 font-medium';
+                    } else if (raw2 > raw1) {
+                        color1 = 'text-gray-500 dark:text-slate-400 font-medium';
+                        color2 = 'text-green-600 dark:text-green-400 font-black';
+                    }
+                }
+
+                return `
+                    <div class="grid grid-cols-3 divide-x divide-gray-200 dark:divide-slate-700 border-b border-gray-100 dark:border-slate-800 last:border-0 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                        <div class="p-4 sm:p-5 flex items-center justify-center text-center ${color1} text-sm sm:text-lg">${val1}</div>
+                        <div class="p-4 sm:p-5 flex items-center justify-center text-center text-gray-500 dark:text-slate-400 text-xs sm:text-sm uppercase tracking-wider font-bold bg-gray-50/50 dark:bg-slate-900/30 shadow-[inset_0_0_8px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_0_8px_rgba(0,0,0,0.2)]">${label}</div>
+                        <div class="p-4 sm:p-5 flex items-center justify-center text-center ${color2} text-sm sm:text-lg">${val2}</div>
+                    </div>
+                `;
+            };
+
+            const t1Record = `${t1Stats.w}-${t1Stats.l}-${t1Stats.t}`;
+            const t2Record = `${t2Stats.w}-${t2Stats.l}-${t2Stats.t}`;
+
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-md dark:shadow-lg overflow-hidden transition-colors duration-300">
+                    
+                    <div class="grid grid-cols-3 divide-x divide-gray-200 dark:divide-slate-700 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 transition-colors">
+                        <div class="p-6 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onclick="quickSearch('${t1Info.team_number}')">
+                            <h2 class="text-3xl sm:text-5xl font-black text-blue-600 dark:text-blue-400 mb-1">${t1Info.team_number}</h2>
+                            <div class="text-gray-900 dark:text-white font-bold text-sm sm:text-lg truncate px-2" title="${t1Info.nickname || t1Info.name}">${t1Info.nickname || t1Info.name}</div>
+                        </div>
+                        <div class="p-4 sm:p-6 flex items-center justify-center">
+                            <div class="w-10 h-10 sm:w-14 sm:h-14 bg-gray-200 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500 dark:text-slate-400 font-black text-sm sm:text-xl shadow-inner">VS</div>
+                        </div>
+                        <div class="p-6 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onclick="quickSearch('${t2Info.team_number}')">
+                            <h2 class="text-3xl sm:text-5xl font-black text-blue-600 dark:text-blue-400 mb-1">${t2Info.team_number}</h2>
+                            <div class="text-gray-900 dark:text-white font-bold text-sm sm:text-lg truncate px-2" title="${t2Info.nickname || t2Info.name}">${t2Info.nickname || t2Info.name}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col">
+                        ${buildRow('Location', `${t1Info.city}, ${t1Info.state_prov}`, `${t2Info.city}, ${t2Info.state_prov}`)}
+                        ${buildRow('Rookie Year', t1Info.rookie_year || 'N/A', t2Info.rookie_year || 'N/A')}
+                        ${buildRow('Events Played', t1Stats.validEvents, t2Stats.validEvents, true, t1Stats.validEvents, t2Stats.validEvents)}
+                        ${buildRow('Total Matches', t1Stats.totalMatches, t2Stats.totalMatches, true, t1Stats.totalMatches, t2Stats.totalMatches)}
+                        ${buildRow('Total Wins', t1Stats.w, t2Stats.w, true, t1Stats.w, t2Stats.w)}
+                        ${buildRow('Record (W-L-T)', t1Record, t2Record)}
+                        ${buildRow('Win Rate', `${t1Stats.winRate}%`, `${t2Stats.winRate}%`, true, t1Stats.winRate, t2Stats.winRate)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Tracker Fetching Helper ---
+        async function getTeamYearStats(teamNum, year) {
+            try {
+                const statuses = await fetchTBA(`/team/frc${teamNum}/events/${year}/statuses`);
+                let w = 0, l = 0, t = 0;
+                if (!statuses) return { w:0, l:0, t:0, winRate: 0 };
+                
+                for (const key in statuses) {
+                    const status = statuses[key];
+                    if (status && status.qual && status.qual.ranking && status.qual.ranking.record) {
+                        w += status.qual.ranking.record.wins;
+                        l += status.qual.ranking.record.losses;
+                        t += status.qual.ranking.record.ties;
+                    }
+                }
+                let winRate = (w+l+t) > 0 ? Math.round((w / (w+l+t)) * 100) : 0;
+                return { w, l, t, winRate };
+            } catch(e) {
+                return { w:0, l:0, t:0, winRate: 0 };
+            }
+        }
+
+        async function loadTracker(year) {
+            const container = document.getElementById('tracker-body');
+            if (!container) return;
+
+            let tracked = getTrackedTeams();
+            
+            if (tracked.length === 0) {
+                container.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-slate-400 font-medium">
+                    No teams in your tracker yet. Search for a team or add one above!
+                </td></tr>`;
                 return;
             }
 
-            lb.forEach((team, index) => {
-                let rankClass = "text-gray-500 dark:text-slate-400";
-                
-                // Only colorize ranks if we are sorting normally (win rate desc)
-                if (lbSortCol === 'winRate' && lbSortDesc) {
-                    if(index === 0) rankClass = "text-yellow-500 dark:text-yellow-400"; // Gold
-                    else if (index === 1) rankClass = "text-gray-400 dark:text-gray-300"; // Silver
-                    else if (index === 2) rankClass = "text-orange-600 dark:text-orange-400"; // Bronze
-                }
+            container.innerHTML = `<tr><td colspan="6" class="px-6 py-12 text-center">
+                <div class="flex flex-col items-center justify-center">
+                    <span class="loader w-8 h-8 mb-3"></span>
+                    <p class="text-sm text-gray-500 dark:text-slate-400">Loading tracker data for ${year}...</p>
+                </div>
+            </td></tr>`;
 
-                container.innerHTML += `
-                    <tr class="hover:bg-gray-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border-b border-gray-100 dark:border-slate-800 last:border-0" onclick="quickSearch(${team.teamNum})">
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-base sm:text-lg font-black ${rankClass}">#${index + 1}</td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center gap-3">
-                                <div class="text-base sm:text-lg font-black text-blue-600 dark:text-blue-400 w-12">${team.teamNum}</div>
-                                <div class="text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-[200px]">${team.name}</div>
-                            </div>
-                        </td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600 dark:text-slate-400 font-medium">
-                            ${team.state || 'N/A'}
-                        </td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600 dark:text-slate-400 font-medium text-center">
-                            ${team.wins}-${team.losses}-${team.ties}
-                        </td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                            <div class="text-base sm:text-lg font-black text-green-600 dark:text-green-400">${team.winRate}%</div>
-                        </td>
-                    </tr>
-                `;
-            });
+            try {
+                const promises = tracked.map(async (t) => {
+                    const stats = await getTeamYearStats(t.num, year);
+                    return { ...t, ...stats };
+                });
+                
+                let results = await Promise.all(promises);
+                results.sort((a, b) => b.winRate - a.winRate);
+
+                container.innerHTML = '';
+                results.forEach(team => {
+                    const isChecked = selectedForCompare.includes(team.num) ? 'checked' : '';
+                    container.innerHTML += `
+                        <tr class="hover:bg-gray-100 dark:hover:bg-slate-800/80 transition-colors border-b border-gray-100 dark:border-slate-800 last:border-0 cursor-pointer" onclick="handleTrackerRowClick('${team.num}')">
+                            <td class="px-4 py-4 whitespace-nowrap text-center compare-col" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="cb-${team.num}" ${isChecked} onchange="toggleCompareSelection(event, ${team.num})" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer">
+                            </td>
+                            <td class="px-2 sm:px-6 py-4 whitespace-nowrap text-base sm:text-lg font-black text-blue-600 dark:text-blue-400">${team.num}</td>
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate max-w-[150px] sm:max-w-[250px]">${team.name}</td>
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600 dark:text-slate-400 font-medium text-center">
+                                ${team.w}-${team.l}-${team.t}
+                            </td>
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
+                                <div class="text-base sm:text-lg font-black text-green-600 dark:text-green-400">${team.winRate}%</div>
+                            </td>
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                                <button onclick="removeTrackedTeam(event, ${team.num})" class="text-gray-400 hover:text-red-500 transition-colors p-2" title="Remove from Tracker">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                console.error("Tracker Load Error:", e);
+                container.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Error loading tracker data: ${e.message}. Try clearing your browser cache.</td></tr>`;
+            }
+        }
+
+        async function handleAddTrackedTeam(e) {
+            e.preventDefault();
+            const input = document.getElementById('tracker-add-input');
+            const errorSpan = document.getElementById('tracker-error');
+            const num = input.value.trim();
+            
+            if(!num) return;
+            
+            input.disabled = true;
+            errorSpan.textContent = "Adding...";
+            errorSpan.classList.remove('hidden', 'text-red-500');
+            errorSpan.classList.add('text-gray-500');
+            
+            try {
+                const teamData = await fetchTBA(`/team/frc${num}`);
+                let tracked = getTrackedTeams();
+                if(!tracked.find(t => t.num === parseInt(num))) {
+                    tracked.push({ num: parseInt(num), name: teamData.nickname || teamData.name });
+                    localStorage.setItem('botanalyze_tracked_teams', JSON.stringify(tracked));
+                    loadTracker(document.getElementById('year-select').value);
+                }
+                input.value = '';
+                errorSpan.classList.add('hidden');
+            } catch(err) {
+                errorSpan.textContent = "Team not found.";
+                errorSpan.classList.remove('text-gray-500');
+                errorSpan.classList.add('text-red-500');
+            } finally {
+                input.disabled = false;
+                setTimeout(() => errorSpan.classList.add('hidden'), 3000);
+            }
+        }
+
+        function removeTrackedTeam(e, num) {
+            e.stopPropagation();
+            let tracked = getTrackedTeams();
+            tracked = tracked.filter(t => t.num !== parseInt(num));
+            localStorage.setItem('botanalyze_tracked_teams', JSON.stringify(tracked));
+            
+            selectedForCompare = selectedForCompare.filter(n => n !== parseInt(num));
+            updateCompareButton();
+
+            loadTracker(document.getElementById('year-select').value);
+        }
+
+        function toggleCurrentTeamTracker() {
+            let tracked = getTrackedTeams();
+            const index = tracked.findIndex(t => t.num === parseInt(currentTeamNum));
+            
+            const starIcon = document.getElementById('star-icon');
+            
+            if (index === -1) {
+                tracked.push({ num: parseInt(currentTeamNum), name: currentTeamNameStr });
+                starIcon.classList.remove('text-gray-400', 'dark:text-slate-400');
+                starIcon.classList.add('text-yellow-500', 'dark:text-yellow-400');
+            } else {
+                tracked.splice(index, 1);
+                starIcon.classList.remove('text-yellow-500', 'dark:text-yellow-400');
+                starIcon.classList.add('text-gray-400', 'dark:text-slate-400');
+            }
+            
+            localStorage.setItem('botanalyze_tracked_teams', JSON.stringify(tracked));
         }
 
         function quickSearch(teamNum) {
             document.getElementById('team-input').value = teamNum;
-            // Scroll to top to see the search happen
             window.scrollTo(0, 0);
             handleSearch(new Event('submit'));
-        }
-
-        // Local Storage Functions for "My Team"
-        function saveMyTeam() {
-            if (currentTeamNum) {
-                localStorage.setItem('botanalyze_my_team', currentTeamNum);
-                
-                // Update Star icon
-                const starIcon = document.getElementById('star-icon');
-                starIcon.classList.remove('text-gray-400', 'dark:text-slate-400');
-                starIcon.classList.add('text-yellow-500', 'dark:text-yellow-400');
-                
-                const btn = document.getElementById('load-my-team-btn');
-                document.getElementById('my-team-label').textContent = `Load ${currentTeamNum}`;
-                btn.classList.remove('hidden');
-            }
-        }
-
-        function loadMyTeam() {
-            const savedTeam = localStorage.getItem('botanalyze_my_team');
-            if (savedTeam) {
-                teamInput.value = savedTeam;
-                handleSearch(new Event('submit'));
-            }
         }
 
         function toggleMatchDetails(matchId) {
@@ -567,21 +763,16 @@
             }
         }
 
-        // Team Quick Stats Modal Functions
         function showTeamStats(team, rank, rp, avg, last) {
             const modal = document.getElementById('team-stat-modal');
             const modalContent = modal.firstElementChild;
-            
-            // Populate data
             document.getElementById('ts-team-num').textContent = team;
             document.getElementById('ts-rank').textContent = rank;
             document.getElementById('ts-rp').textContent = `${rp} RP`;
             document.getElementById('ts-avg').textContent = `${avg} pts`;
             document.getElementById('ts-last').textContent = last === 'None' ? 'N/A' : `${last} pts`;
-
-            // Display
             modal.classList.remove('hidden');
-            void modal.offsetWidth; // Trigger reflow for animation
+            void modal.offsetWidth; 
             modal.classList.remove('opacity-0');
             modalContent.classList.remove('scale-95');
         }
@@ -589,54 +780,39 @@
         function closeTeamStats(event) {
             const modal = document.getElementById('team-stat-modal');
             const modalContent = modal.firstElementChild;
-            
             modal.classList.add('opacity-0');
             modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300); // Matches the CSS transition duration
+            setTimeout(() => { modal.classList.add('hidden'); }, 300); 
         }
 
-        // API Fetcher
         async function fetchTBA(endpoint) {
-            if (!apiKey) {
-                throw new Error("Missing API Key in code. Please add it.");
-            }
-
+            if (!apiKey) throw new Error("Missing API Key in code. Please add it.");
             const response = await fetch(`${TBA_BASE_URL}${endpoint}`, {
                 method: 'GET',
-                headers: {
-                    'X-TBA-Auth-Key': apiKey,
-                    'accept': 'application/json'
-                }
+                headers: { 'X-TBA-Auth-Key': apiKey, 'accept': 'application/json' }
             });
-
             if (!response.ok) {
                 if (response.status === 401) throw new Error("Invalid API Key.");
                 if (response.status === 404) throw new Error("Data not found. Please check the team number.");
                 throw new Error(`API Error: ${response.status}`);
             }
-
             return await response.json();
         }
 
-        // Main Search Handler
         async function handleSearch(e) {
             e.preventDefault();
             const teamNum = teamInput.value;
             const year = yearSelect.value;
-
             if (!teamNum) return;
 
-            // UI Transitions
             searchContainer.classList.remove('py-16', 'sm:py-24');
             searchContainer.classList.add('py-6');
             document.getElementById('hero-title').classList.add('hidden');
             document.getElementById('hero-subtitle').classList.add('hidden');
-            document.getElementById('leaderboard-section').classList.add('hidden');
+            document.getElementById('team-tracker-section').classList.add('hidden');
             
             eventPage.classList.add('hidden');
+            comparePage.classList.add('hidden');
             dashboard.classList.remove('hidden');
             loadingState.classList.remove('hidden');
             loadingState.classList.add('flex');
@@ -644,30 +820,23 @@
             errorMessage.classList.add('hidden');
 
             try {
-                // Fetch basic team info
                 const teamData = await fetchTBA(`/team/frc${teamNum}`);
                 currentTeamNum = teamNum;
-                
-                // Fetch events for the year
+                currentTeamNameStr = teamData.nickname || teamData.name;
                 const eventsData = await fetchTBA(`/team/frc${teamNum}/events/${year}`);
-                
-                // Fetch statuses for those events to get rankings and W/L records
                 const eventStatuses = {};
                 
-                // We fetch statuses in parallel to save time
                 const statusPromises = eventsData.map(async (event) => {
                     try {
                         const status = await fetchTBA(`/team/frc${teamNum}/event/${event.key}/status`);
                         eventStatuses[event.key] = status;
                     } catch (err) {
-                        eventStatuses[event.key] = null; // No status available
+                        eventStatuses[event.key] = null; 
                     }
                 });
                 
                 await Promise.all(statusPromises);
-
                 renderData(teamData, eventsData, eventStatuses, year);
-
             } catch (error) {
                 showError(error.message);
             }
@@ -681,22 +850,18 @@
         }
 
         function renderData(team, events, statuses, year) {
-            // Hide Loader
             loadingState.classList.add('hidden');
             loadingState.classList.remove('flex');
             dataContent.classList.remove('hidden');
 
-            // --- Team Header ---
-            const displayTeamName = team.nickname || team.name;
             document.getElementById('display-team-num').textContent = team.team_number;
-            document.getElementById('display-team-name').textContent = displayTeamName;
+            document.getElementById('display-team-name').textContent = currentTeamNameStr;
             document.getElementById('team-rookie-year').textContent = `Est. ${team.rookie_year}`;
             document.getElementById('display-location').textContent = `${team.city}, ${team.state_prov}, ${team.country}`;
             
-            // Check if this is the saved team
-            const savedTeam = localStorage.getItem('botanalyze_my_team');
+            let tracked = getTrackedTeams();
             const starIcon = document.getElementById('star-icon');
-            if (savedTeam === String(team.team_number)) {
+            if (tracked.find(t => t.num === parseInt(team.team_number))) {
                 starIcon.classList.remove('text-gray-400', 'dark:text-slate-400');
                 starIcon.classList.add('text-yellow-500', 'dark:text-yellow-400');
             } else {
@@ -715,14 +880,12 @@
                 webBtn.classList.add('hidden');
             }
 
-            // --- Events Section ---
             document.getElementById('display-year').textContent = year;
             document.getElementById('event-count').textContent = `${events.length} Events`;
             
             const eventsContainer = document.getElementById('events-container');
-            eventsContainer.innerHTML = ''; // clear old
+            eventsContainer.innerHTML = ''; 
             
-            // Sort events by date
             events.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
 
             let totalWins = 0, totalLosses = 0, totalTies = 0;
@@ -758,7 +921,6 @@
                     }
                 }
 
-                // Playoff status
                 let playoffStr = '';
                 if(status && status.playoff) {
                     const po = status.playoff;
@@ -767,12 +929,10 @@
                     </span>`;
                 }
 
-                // Format Dates
                 const dateOptions = { month: 'short', day: 'numeric' };
                 const startDate = new Date(event.start_date).toLocaleDateString(undefined, dateOptions);
                 const endDate = new Date(event.end_date).toLocaleDateString(undefined, dateOptions);
                 const dateStr = startDate === endDate ? startDate : `${startDate} - ${endDate}`;
-
                 const safeEventName = event.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
                 const cardHtml = `
@@ -801,19 +961,14 @@
                 eventsContainer.insertAdjacentHTML('beforeend', cardHtml);
             });
 
-            // --- Sidebar Stats ---
             document.getElementById('stat-wins').textContent = totalWins;
             document.getElementById('stat-losses').textContent = totalLosses;
-            
             const totalMatches = totalWins + totalLosses + totalTies;
             const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
             document.getElementById('stat-winrate').textContent = `${winRate}%`;
 
-            // Update local leaderboard
-            updateLeaderboard(team.team_number, displayTeamName, totalWins, totalLosses, totalTies, winRate, team.state_prov);
         }
 
-        // --- Event Details Page Functions ---
         async function openEventDetails(eventKey, teamNum, eventName) {
             searchContainer.classList.add('hidden');
             dashboard.classList.add('hidden');
@@ -835,15 +990,13 @@
             `;
 
             try {
-                // Fetch ALL matches and rankings for the event
                 const [allMatches, rankingsData] = await Promise.all([
                     fetchTBA(`/event/${eventKey}/matches`),
-                    fetchTBA(`/event/${eventKey}/rankings`).catch(() => null) // Fails gracefully if no rankings yet
+                    fetchTBA(`/event/${eventKey}/rankings`).catch(() => null) 
                 ]);
                 
                 eventRankings = rankingsData && rankingsData.rankings ? rankingsData.rankings : [];
 
-                // We must sort ALL matches chronologically before calculating stats to build an accurate match history
                 const compLevelOrder = { qm: 1, ef: 2, qf: 3, sf: 4, f: 5 };
                 allMatches.sort((a, b) => {
                     if (compLevelOrder[a.comp_level] !== compLevelOrder[b.comp_level]) {
@@ -855,7 +1008,6 @@
 
                 calculateEventStats(allMatches);
 
-                // Filter to only this team's matches for display
                 const teamMatches = allMatches.filter(m => 
                     m.alliances.red.team_keys.includes(`frc${teamNum}`) || 
                     m.alliances.blue.team_keys.includes(`frc${teamNum}`)
@@ -870,7 +1022,6 @@
             }
         }
 
-        // Calculates running stats and builds an ordered history array for each team
         function calculateEventStats(matches) {
             eventStats = {};
             matches.forEach(m => {
@@ -882,7 +1033,6 @@
                     let teleop = isPlayed ? (bd.teleopPoints || bd.teleop_points || 0) : 0;
                     let total = isPlayed ? m.alliances[color].score : 0;
                     
-                    // Fallback estimate if specific breakdowns are missing
                     if (isPlayed && auto === 0 && teleop === 0 && total > 0) {
                         auto = total * 0.3;
                         teleop = total * 0.7;
@@ -893,14 +1043,11 @@
                         if (!eventStats[t]) {
                             eventStats[t] = { matches: 0, auto: 0, teleop: 0, total: 0, history: [] };
                         }
-                        
                         if (isPlayed) {
                             eventStats[t].matches++;
                             eventStats[t].auto += auto;
                             eventStats[t].teleop += teleop;
                             eventStats[t].total += total;
-                            
-                            // Log this match in the chronological history for this team
                             eventStats[t].history.push({ key: m.key, score: total });
                         }
                     });
@@ -918,13 +1065,6 @@
             return rankObj ? { rank: rankObj.rank, rp: rankObj.sort_orders[0] } : { rank: 'N/A', rp: 0 };
         }
 
-        function backToDashboard() {
-            eventPage.classList.add('hidden');
-            searchContainer.classList.remove('hidden');
-            dashboard.classList.remove('hidden');
-            window.scrollTo(0, 0);
-        }
-
         function renderEventMatches(matches, teamNum, container) {
             if (!matches || matches.length === 0) {
                 container.innerHTML = `
@@ -934,7 +1074,6 @@
                 return;
             }
 
-            // Top section: Your Team's Ranking Info
             const myRank = getTeamRank(teamNum);
             let headerHtml = `
                 <div class="bg-gray-100 dark:bg-slate-900 sm:rounded-lg p-5 sm:p-6 mb-0 sm:mb-6 flex justify-between items-center border-b sm:border border-gray-200 dark:border-slate-700 transition-colors">
@@ -949,10 +1088,8 @@
                 </div>
             `;
 
-            // Start of Flex Container for Matches
             let html = headerHtml + `
                 <div class="flex flex-col sm:rounded-lg border-y sm:border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-full overflow-hidden transition-colors duration-300">
-                    <!-- Desktop Header Row (Hidden on Mobile) -->
                     <div class="hidden sm:flex flex-row text-gray-600 dark:text-slate-400 uppercase text-sm font-bold tracking-wider bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 transition-colors">
                         <div class="w-32 px-6 py-4 text-center">Match</div>
                         <div class="flex-1 px-6 py-4 border-l border-gray-200 dark:border-slate-700/50 text-center">Red Alliance</div>
@@ -962,7 +1099,6 @@
             `;
 
             matches.forEach(m => {
-                // Strip 'frc' prefix
                 const redTeams = m.alliances.red.team_keys.map(t => t.replace('frc', ''));
                 const blueTeams = m.alliances.blue.team_keys.map(t => t.replace('frc', ''));
                 const redScore = m.alliances.red.score;
@@ -972,8 +1108,6 @@
                 const myAlliance = isMyTeamRed ? redTeams : blueTeams;
                 const oppAlliance = isMyTeamRed ? blueTeams : redTeams;
 
-                // Make teams clickable buttons for Mobile/Desktop popup
-                // Dynamically look backwards in the team's history to find the score BEFORE the clicked match
                 const formatTeams = (teams, isRed, currentMatchKey) => teams.map(t => {
                     const avgPts = eventStats[t] && eventStats[t].matches > 0 ? (eventStats[t].total / eventStats[t].matches).toFixed(1) : '0.0';
                     const rankInfo = getTeamRank(t);
@@ -981,17 +1115,9 @@
                     let lastPts = 'None';
                     if (eventStats[t] && eventStats[t].history.length > 0) {
                         const history = eventStats[t].history;
-                        // Find where THIS match is in their history
                         const currentIndex = history.findIndex(h => h.key === currentMatchKey);
-                        
-                        if (currentIndex > 0) {
-                            // Fetch the score from the match right before this one
-                            lastPts = history[currentIndex - 1].score;
-                        } else if (currentIndex === -1) {
-                            // If this match isn't in history yet (hasn't been played), fetch their absolute last played match
-                            lastPts = history[history.length - 1].score;
-                        } 
-                        // If currentIndex === 0, it's their first match, so 'None' is correct.
+                        if (currentIndex > 0) { lastPts = history[currentIndex - 1].score; } 
+                        else if (currentIndex === -1) { lastPts = history[history.length - 1].score; } 
                     }
                     
                     const tooltipText = `Rank: ${rankInfo.rank} (${rankInfo.rp} RP)\nAvg Pts: ${avgPts}\nPrevious Match: ${lastPts} pts`;
@@ -1004,13 +1130,10 @@
                     }
                 }).join('');
 
-                // Prediction Logic
                 let myAutoTotal = 0, myTeleopTotal = 0;
                 let oppAutoTotal = 0, oppTeleopTotal = 0;
-                
                 let myTeamListHtml = '', oppTeamListHtml = '';
                 let myTeleopListHtml = '', oppTeleopListHtml = '';
-                
                 let strongestOpponent = { team: '', teleop: -1 };
                 let weakestOppAuto = { team: '', auto: 999 };
 
@@ -1051,7 +1174,6 @@
                     strategyStr += `Team <b>${weakestOppAuto.team}</b> struggles in Autonomous, capitalize on early points.`;
                 }
 
-                // Identify winner for display
                 let redScoreClass = redScore > blueScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
                 let blueScoreClass = blueScore > redScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
                 let scoreText = '';
@@ -1077,17 +1199,13 @@
                 const alliesStr = myAlliance.filter(t => t !== String(teamNum)).join(' and ');
                 const oppsStr = oppAlliance.join(', ');
 
-                // Main Flexible Row
                 html += `
                     <div class="bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors flex flex-row items-stretch border-b border-gray-200 dark:border-slate-800 last:border-0 relative">
-                        
-                        <!-- Match Block -->
                         <div class="w-[75px] sm:w-32 py-3 flex flex-col justify-center items-center text-center border-l-2 border-transparent shrink-0">
                             <span class="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-0.5 transition-colors">${levelName}</span>
                             <span class="text-sm sm:text-lg font-black text-gray-900 dark:text-slate-200 transition-colors">${matchNum}</span>
                         </div>
                         
-                        <!-- Alliances Block (Stacks on Mobile, Side-by-side on Desktop) -->
                         <div class="flex-1 flex flex-col sm:flex-row border-l border-r border-gray-200 dark:border-slate-800 min-w-0 transition-colors">
                             <div class="flex-1 flex items-center justify-around px-2 sm:px-6 py-2.5 sm:py-5 bg-red-50 dark:bg-red-950/10 text-red-900 dark:text-red-100 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-slate-800 text-sm sm:text-lg w-full whitespace-nowrap transition-colors">
                                 ${formatTeams(redTeams, true, m.key)}
@@ -1097,13 +1215,11 @@
                             </div>
                         </div>
                         
-                        <!-- Score / Predict Block -->
                         <div class="w-[85px] sm:w-40 flex items-center justify-center font-mono text-sm sm:text-xl bg-gray-50 dark:bg-slate-900/30 p-2 sm:px-6 shrink-0 transition-colors">
                             ${scoreText}
                         </div>
                     </div>
 
-                    <!-- Hidden Details / Prediction Block -->
                     <div id="details-${m.key}" class="hidden bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 w-full transition-colors duration-300">
                         <div class="p-5 sm:p-8 text-gray-700 dark:text-slate-300 text-sm sm:text-base leading-relaxed border-l-4 ${isMyTeamRed ? 'border-red-500' : 'border-blue-500'} transition-colors">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
@@ -1160,11 +1276,10 @@
                 `;
             });
 
-            html += `</div>`; // Close Main Flex Container
+            html += `</div>`; 
             container.innerHTML = html;
         }
 
-        // Run Init
         init();
     </script>
 </body>
