@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BotAnalyze | FRC Data Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enables toggleable dark mode
+            theme: {
+                extend: {
+                    colors: {
+                        first: '#0066b3', // FIRST Blue
+                        firstRed: '#ed1c24', // FIRST Red
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        // Check local storage / system preference before rendering to prevent flash of wrong theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        
+        /* Dark Mode Scrollbar */
+        html.dark ::-webkit-scrollbar-track { background: #0f172a; }
+        html.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Light Mode Scrollbar */
+        html:not(.dark) ::-webkit-scrollbar-track { background: #f8fafc; }
+        html:not(.dark) ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #e2e8f0;
+            border-bottom-color: #3b82f6;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        html.dark .loader { border: 3px solid #1e293b; border-bottom-color: #3b82f6; }
+        
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-950 text-gray-700 dark:text-slate-300 font-sans min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navbar -->
+    <nav class="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 sm:h-20">
+                <div class="flex items-center gap-3 cursor-pointer group" onclick="resetToHome()" title="Return Home">
+                    <i class="fa-solid fa-robot text-blue-600 dark:text-blue-500 text-3xl group-hover:scale-110 transition-transform"></i>
+                    <span class="font-bold text-2xl text-gray-900 dark:text-white tracking-tight transition-colors">Bot<span class="text-blue-600 dark:text-blue-500">Analyze</span></span>
+                </div>
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <button id="theme-btn" onclick="toggleTheme()" class="p-2 sm:p-3 rounded-full transition-colors text-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12">
+                        <!-- Icon injected by JS -->
+                    </button>
+                    <button id="load-my-team-btn" onclick="loadMyTeam()" class="hidden text-base bg-blue-100 dark:bg-blue-600/20 hover:bg-blue-200 dark:hover:bg-blue-600/40 text-blue-700 dark:text-blue-400 font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-md transition-colors border border-blue-200 dark:border-blue-800/50 flex items-center gap-2">
+                        <i class="fa-solid fa-star"></i> <span class="hidden sm:inline" id="my-team-label">My Team</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col">
+        <!-- Search Section & Leaderboard -->
+        <div class="w-full bg-white dark:bg-slate-900 py-16 sm:py-24 border-b border-gray-200 dark:border-slate-800 transition-all duration-500" id="search-container">
+            <div class="max-w-5xl mx-auto px-4 text-center">
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 transition-colors" id="hero-title">Analyze FRC Team Performance</h1>
+                <p class="text-lg text-gray-600 dark:text-slate-400 mb-10 transition-colors" id="hero-subtitle">Enter an FRC team number to pull their data from The Blue Alliance.</p>
+                
+                <form id="search-form" class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+                    <div class="relative w-full max-w-xs">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <span class="text-gray-500 font-bold text-lg">FRC</span>
+                        </div>
+                        <input type="number" id="team-input" placeholder="Team Number (e.g. 254)" required min="1"
+                            class="block w-full pl-14 pr-4 py-4 border border-gray-300 dark:border-slate-700 rounded-lg text-lg leading-5 bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                    </div>
+                    
+                    <select id="year-select" class="w-full sm:w-auto block pl-4 pr-10 py-4 border border-gray-300 dark:border-slate-700 rounded-lg text-lg leading-5 bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        <!-- Populated by JS -->
+                    </select>
+
+                    <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 px-8 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-magnifying-glass"></i> Analyze
+                    </button>
+                </form>
+
+                <!-- Dynamic Leaderboard -->
+                <div id="leaderboard-section" class="fade-in max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-md dark:shadow-lg overflow-hidden transition-colors duration-300 text-left">
+                    <div class="bg-gray-50 dark:bg-slate-900 px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 transition-colors duration-300">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <i class="fa-solid fa-fire text-orange-500"></i> Analyzed Leaderboard
+                        </h3>
+                        
+                        <!-- Leaderboard Filters & Controls -->
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-auto">
+                                <i class="fa-solid fa-filter absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 text-sm"></i>
+                                <select id="lb-state-filter" onchange="renderLeaderboard()" class="w-full sm:w-auto pl-8 pr-8 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors appearance-none">
+                                    <option value="All">All Regions</option>
+                                    <!-- Options injected via JS -->
+                                </select>
+                            </div>
+                            <div class="relative w-full sm:w-auto">
+                                <select id="lb-limit" onchange="renderLeaderboard()" class="w-full sm:w-auto pl-3 pr-8 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors appearance-none">
+                                    <option value="10">Top 10</option>
+                                    <option value="25">Top 25</option>
+                                    <option value="50">Top 50</option>
+                                    <option value="All">View All</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto max-h-[500px] overflow-y-auto relative">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead class="sticky top-0 z-10 bg-white dark:bg-slate-800 shadow-sm border-b border-gray-200 dark:border-slate-700 transition-colors duration-300">
+                                <tr class="text-xs sm:text-sm text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                                    <th class="px-4 sm:px-6 py-3 font-semibold w-16">Rank</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('teamNum')">
+                                        Team <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
+                                    </th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('state')">
+                                        Region <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
+                                    </th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('wins')">
+                                        Record <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
+                                    </th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-right cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group" onclick="sortLeaderboard('winRate')">
+                                        Win % <i class="fa-solid fa-sort ml-1 opacity-50 group-hover:opacity-100"></i>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body" class="divide-y divide-gray-100 dark:divide-slate-800 transition-colors duration-300">
+                                <!-- Leaderboard rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Dashboard Section (Hidden by default) -->
+        <div id="dashboard" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+            
+            <!-- Loading State -->
+            <div id="loading-state" class="hidden flex-col items-center justify-center py-20">
+                <span class="loader w-16 h-16 mb-6"></span>
+                <p class="text-lg text-gray-500 dark:text-slate-400 animate-pulse">Fetching data from The Blue Alliance...</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="error-message" class="hidden bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-6 py-4 rounded-lg relative mb-6 text-lg transition-colors" role="alert">
+                <strong class="font-bold"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Error:</strong>
+                <span class="block sm:inline" id="error-text">Something went wrong.</span>
+            </div>
+
+            <!-- Data Content -->
+            <div id="data-content" class="hidden fade-in space-y-8">
+                
+                <!-- Team Header Card -->
+                <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-md dark:shadow-lg relative transition-colors duration-300">
+                    <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+                    <div class="p-6 sm:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div>
+                            <div class="flex items-center gap-4 mb-3">
+                                <h2 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white transition-colors">Team <span id="display-team-num"></span></h2>
+                                <span id="team-rookie-year" class="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-slate-900 text-sm font-bold text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 transition-colors"></span>
+                                <button onclick="saveMyTeam()" class="ml-2 text-gray-400 dark:text-slate-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors" title="Save as My Team">
+                                    <i class="fa-solid fa-star text-2xl" id="star-icon"></i>
+                                </button>
+                            </div>
+                            <h3 id="display-team-name" class="text-2xl text-blue-600 dark:text-blue-400 font-medium mb-3 transition-colors"></h3>
+                            <p class="text-lg text-gray-500 dark:text-slate-400 flex items-center gap-2 transition-colors">
+                                <i class="fa-solid fa-location-dot"></i> <span id="display-location"></span>
+                            </p>
+                        </div>
+                        <div class="flex flex-col gap-3 min-w-[200px]">
+                            <a id="team-website" href="#" target="_blank" class="hidden bg-gray-100 hover:bg-gray-200 dark:bg-slate-900 dark:hover:bg-slate-700 text-gray-800 dark:text-white text-lg font-medium text-center py-3 px-6 rounded-lg transition-colors border border-gray-200 dark:border-slate-700">
+                                <i class="fa-solid fa-globe mr-2"></i> Visit Website
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    <!-- Events List (Takes up 2 columns on large screens) -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 pb-2 transition-colors">
+                            <h3 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 transition-colors">
+                                <i class="fa-solid fa-calendar-days text-blue-500"></i> Event Results (<span id="display-year"></span>)
+                            </h3>
+                            <span id="event-count" class="text-base font-medium text-gray-500 dark:text-slate-400 transition-colors"></span>
+                        </div>
+                        
+                        <div id="events-container" class="space-y-4">
+                            <!-- Events injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Stats / Robot Info -->
+                    <div class="space-y-8">
+                        <!-- Quick Stats -->
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 sm:p-8 shadow-md dark:shadow-lg transition-colors duration-300">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6 border-b border-gray-200 dark:border-slate-700 pb-3 transition-colors">Season Summary</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-gray-50 dark:bg-slate-900 rounded-lg p-5 text-center border border-gray-100 dark:border-transparent transition-colors">
+                                    <div class="text-gray-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Total Wins</div>
+                                    <div class="text-4xl font-black text-green-600 dark:text-green-400" id="stat-wins">0</div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-slate-900 rounded-lg p-5 text-center border border-gray-100 dark:border-transparent transition-colors">
+                                    <div class="text-gray-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Total Losses</div>
+                                    <div class="text-4xl font-black text-red-600 dark:text-red-400" id="stat-losses">0</div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-slate-900 rounded-lg p-5 text-center col-span-2 mt-2 border border-gray-100 dark:border-transparent transition-colors">
+                                    <div class="text-gray-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Win Rate</div>
+                                    <div class="text-5xl font-black text-blue-600 dark:text-blue-400" id="stat-winrate">0%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-6 sm:p-8 shadow-md dark:shadow-lg transition-colors duration-300">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 border-b border-gray-200 dark:border-slate-700 pb-3 transition-colors">About The Data</h3>
+                            <p class="text-base text-gray-600 dark:text-slate-400 mb-6 leading-relaxed transition-colors">
+                                All data is sourced directly from The Blue Alliance API. Click on any event to see advanced analytics, team strengths, and match predictions.
+                            </p>
+                            <a href="https://www.thebluealliance.com/" target="_blank" class="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 text-base font-medium flex items-center gap-1 transition-colors">
+                                Powered by TBA <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Page Section (Hidden by default) -->
+        <div id="event-page" class="hidden max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-4 sm:py-8 w-full flex-grow fade-in">
+            <button onclick="backToDashboard()" class="mb-4 sm:mb-8 mx-4 sm:mx-0 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 text-lg font-medium">
+                <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+            </button>
+            <div class="bg-white dark:bg-slate-800 sm:rounded-xl border-y sm:border border-gray-200 dark:border-slate-700 shadow-md dark:shadow-lg overflow-hidden transition-colors duration-300">
+                <div class="p-5 sm:p-8 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight transition-colors" id="event-page-title">Event Details</h2>
+                    <p class="text-base sm:text-lg text-gray-500 dark:text-slate-400 mt-2 transition-colors" id="event-page-subtitle"></p>
+                </div>
+                <div class="p-0 sm:p-8" id="event-page-body">
+                    <!-- Matches injected here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Team Quick Stats Popup Modal -->
+    <div id="team-stat-modal" class="fixed inset-0 bg-gray-900/50 dark:bg-black/70 backdrop-blur-sm hidden z-[110] flex items-center justify-center px-4 opacity-0 transition-opacity duration-300" onclick="closeTeamStats(event)">
+        <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-all duration-300" onclick="event.stopPropagation()">
+            <div class="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900 rounded-t-xl transition-colors">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">Team <span id="ts-team-num" class="text-blue-600 dark:text-blue-400"></span></h3>
+                <button onclick="closeTeamStats()" class="text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-full w-10 h-10 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-5">
+                <div class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-4 transition-colors">
+                    <span class="text-gray-500 dark:text-slate-400 uppercase tracking-wider text-sm font-bold flex items-center gap-2"><i class="fa-solid fa-ranking-star"></i> Rank</span>
+                    <span class="text-gray-900 dark:text-white font-black text-2xl" id="ts-rank"></span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-4 transition-colors">
+                    <span class="text-gray-500 dark:text-slate-400 uppercase tracking-wider text-sm font-bold flex items-center gap-2"><i class="fa-solid fa-star"></i> Ranking Pts</span>
+                    <span class="text-blue-600 dark:text-blue-400 font-black text-2xl" id="ts-rp"></span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-100 dark:border-slate-700 pb-4 transition-colors">
+                    <span class="text-gray-500 dark:text-slate-400 uppercase tracking-wider text-sm font-bold flex items-center gap-2"><i class="fa-solid fa-chart-line"></i> Avg Points</span>
+                    <span class="text-green-600 dark:text-green-400 font-black text-2xl" id="ts-avg"></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-500 dark:text-slate-400 uppercase tracking-wider text-sm font-bold flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left"></i> Last Match</span>
+                    <span class="text-yellow-600 dark:text-yellow-400 font-black text-2xl" id="ts-last"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const TBA_BASE_URL = 'https://www.thebluealliance.com/api/v3';
+        const apiKey = 'oNOtsAHcwgn37Zq7Ym8d6FUes8G9fybLUAQFtFI2JdBEoLgSWnHarwJjwZdH0UVu'; // Replace this with your actual key!
+        let currentTeamNum = null;
+        let eventStats = {}; // To store averages and chronological history for all teams
+        let eventRankings = []; // To store RP data
+        
+        // Leaderboard State
+        let lbSortCol = 'winRate';
+        let lbSortDesc = true;
+
+        // Default Leaderboard - Hall of Fame Teams to seed the UI
+        const defaultLeaderboard = [
+            { teamNum: 254, name: 'The Cheesy Poofs', state: 'California', wins: 53, losses: 3, ties: 1, winRate: 93 },
+            { teamNum: 1678, name: 'Citrus Circuits', state: 'California', wins: 58, losses: 6, ties: 0, winRate: 91 },
+            { teamNum: 2056, name: 'OP Robotics', state: 'Ontario', wins: 50, losses: 5, ties: 0, winRate: 91 },
+            { teamNum: 1323, name: 'MadTown Robotics', state: 'California', wins: 45, losses: 8, ties: 0, winRate: 85 },
+            { teamNum: 118, name: 'Robonauts', state: 'Texas', wins: 42, losses: 12, ties: 1, winRate: 76 }
+        ];
+        
+        // DOM Elements
+        const searchForm = document.getElementById('search-form');
+        const teamInput = document.getElementById('team-input');
+        const yearSelect = document.getElementById('year-select');
+        
+        const searchContainer = document.getElementById('search-container');
+        const dashboard = document.getElementById('dashboard');
+        const eventPage = document.getElementById('event-page');
+        const loadingState = document.getElementById('loading-state');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const dataContent = document.getElementById('data-content');
+        
+        // Initialize
+        function init() {
+            updateThemeIcon(); // Set initial theme icon
+
+            // Populate years (1992 to current year)
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear; y >= 1992; y--) {
+                const option = document.createElement('option');
+                option.value = y;
+                option.textContent = y;
+                yearSelect.appendChild(option);
+            }
+
+            // Check for saved team
+            const savedTeam = localStorage.getItem('botanalyze_my_team');
+            if (savedTeam) {
+                const btn = document.getElementById('load-my-team-btn');
+                document.getElementById('my-team-label').textContent = `Load ${savedTeam}`;
+                btn.classList.remove('hidden');
+            }
+
+            // Render Leaderboard
+            renderLeaderboard();
+
+            // Event Listeners
+            searchForm.addEventListener('submit', handleSearch);
+        }
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            const doc = document.documentElement;
+            if (doc.classList.contains('dark')) {
+                doc.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                doc.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+            updateThemeIcon();
+        }
+
+        function updateThemeIcon() {
+            const btn = document.getElementById('theme-btn');
+            if (!btn) return;
+            if (document.documentElement.classList.contains('dark')) {
+                btn.innerHTML = '<i class="fa-solid fa-sun text-yellow-400"></i>';
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-moon text-slate-500"></i>';
+            }
+        }
+
+        // Home Button Logic
+        function resetToHome() {
+            searchContainer.classList.remove('hidden');
+            searchContainer.classList.remove('py-6');
+            searchContainer.classList.add('py-16', 'sm:py-24');
+            document.getElementById('hero-title').classList.remove('hidden');
+            document.getElementById('hero-subtitle').classList.remove('hidden');
+            document.getElementById('leaderboard-section').classList.remove('hidden');
+            
+            dashboard.classList.add('hidden');
+            eventPage.classList.add('hidden');
+            teamInput.value = '';
+            
+            window.scrollTo(0, 0);
+            renderLeaderboard(); // refresh just in case
+        }
+
+        // Leaderboard Logic
+        function sortLeaderboard(col) {
+            if (lbSortCol === col) {
+                lbSortDesc = !lbSortDesc; // Toggle sort direction
+            } else {
+                lbSortCol = col;
+                lbSortDesc = (col === 'winRate' || col === 'wins'); // Default descending for stats, asc for names
+            }
+            renderLeaderboard();
+        }
+
+        function updateLeaderboard(teamNum, name, wins, losses, ties, winRate, state) {
+            let lb = JSON.parse(localStorage.getItem('botanalyze_leaderboard')) || defaultLeaderboard;
+            
+            // Format state safely
+            let formattedState = state || 'Unknown';
+            
+            // Remove existing entry for this team if it exists
+            lb = lb.filter(t => t.teamNum !== Number(teamNum));
+            // Add new entry
+            lb.push({ teamNum: Number(teamNum), name, state: formattedState, wins, losses, ties, winRate });
+            
+            // Sort by win rate initially
+            lb.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+            // Increased to store Top 200 locally
+            lb = lb.slice(0, 200);
+            
+            localStorage.setItem('botanalyze_leaderboard', JSON.stringify(lb));
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            let lb = JSON.parse(localStorage.getItem('botanalyze_leaderboard')) || defaultLeaderboard;
+            const container = document.getElementById('leaderboard-body');
+            const stateSelect = document.getElementById('lb-state-filter');
+            const limitSelect = document.getElementById('lb-limit');
+            
+            if(!container || !stateSelect || !limitSelect) return;
+            
+            // 1. Maintain State Dropdown Options
+            const currentStateSelection = stateSelect.value;
+            const states = [...new Set(lb.map(t => t.state).filter(Boolean))].sort();
+            
+            stateSelect.innerHTML = '<option value="All">All Regions</option>';
+            states.forEach(s => {
+                const selected = (s === currentStateSelection) ? 'selected' : '';
+                stateSelect.innerHTML += `<option value="${s}" ${selected}>${s}</option>`;
+            });
+
+            // 2. Filter by State
+            if (stateSelect.value !== 'All') {
+                lb = lb.filter(t => t.state === stateSelect.value);
+            }
+
+            // 3. Sort Data
+            lb.sort((a, b) => {
+                let valA = a[lbSortCol];
+                let valB = b[lbSortCol];
+                
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return lbSortDesc ? 1 : -1;
+                if (valA > valB) return lbSortDesc ? -1 : 1;
+                
+                // Tie breaker: if sorting by Win Rate, use total wins
+                if (lbSortCol === 'winRate') return lbSortDesc ? (b.wins - a.wins) : (a.wins - b.wins);
+                return 0;
+            });
+
+            // 4. Limit Rows
+            if (limitSelect.value !== 'All') {
+                lb = lb.slice(0, parseInt(limitSelect.value));
+            }
+
+            // 5. Render HTML
+            container.innerHTML = '';
+            if (lb.length === 0) {
+                container.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-slate-400">No teams found matching this filter.</td></tr>`;
+                return;
+            }
+
+            lb.forEach((team, index) => {
+                let rankClass = "text-gray-500 dark:text-slate-400";
+                
+                // Only colorize ranks if we are sorting normally (win rate desc)
+                if (lbSortCol === 'winRate' && lbSortDesc) {
+                    if(index === 0) rankClass = "text-yellow-500 dark:text-yellow-400"; // Gold
+                    else if (index === 1) rankClass = "text-gray-400 dark:text-gray-300"; // Silver
+                    else if (index === 2) rankClass = "text-orange-600 dark:text-orange-400"; // Bronze
+                }
+
+                container.innerHTML += `
+                    <tr class="hover:bg-gray-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border-b border-gray-100 dark:border-slate-800 last:border-0" onclick="quickSearch(${team.teamNum})">
+                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-base sm:text-lg font-black ${rankClass}">#${index + 1}</td>
+                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-3">
+                                <div class="text-base sm:text-lg font-black text-blue-600 dark:text-blue-400 w-12">${team.teamNum}</div>
+                                <div class="text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-[200px]">${team.name}</div>
+                            </div>
+                        </td>
+                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600 dark:text-slate-400 font-medium">
+                            ${team.state || 'N/A'}
+                        </td>
+                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm sm:text-base text-gray-600 dark:text-slate-400 font-medium text-center">
+                            ${team.wins}-${team.losses}-${team.ties}
+                        </td>
+                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                            <div class="text-base sm:text-lg font-black text-green-600 dark:text-green-400">${team.winRate}%</div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function quickSearch(teamNum) {
+            document.getElementById('team-input').value = teamNum;
+            // Scroll to top to see the search happen
+            window.scrollTo(0, 0);
+            handleSearch(new Event('submit'));
+        }
+
+        // Local Storage Functions for "My Team"
+        function saveMyTeam() {
+            if (currentTeamNum) {
+                localStorage.setItem('botanalyze_my_team', currentTeamNum);
+                
+                // Update Star icon
+                const starIcon = document.getElementById('star-icon');
+                starIcon.classList.remove('text-gray-400', 'dark:text-slate-400');
+                starIcon.classList.add('text-yellow-500', 'dark:text-yellow-400');
+                
+                const btn = document.getElementById('load-my-team-btn');
+                document.getElementById('my-team-label').textContent = `Load ${currentTeamNum}`;
+                btn.classList.remove('hidden');
+            }
+        }
+
+        function loadMyTeam() {
+            const savedTeam = localStorage.getItem('botanalyze_my_team');
+            if (savedTeam) {
+                teamInput.value = savedTeam;
+                handleSearch(new Event('submit'));
+            }
+        }
+
+        function toggleMatchDetails(matchId) {
+            const row = document.getElementById(`details-${matchId}`);
+            if (row.classList.contains('hidden')) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+            }
+        }
+
+        // Team Quick Stats Modal Functions
+        function showTeamStats(team, rank, rp, avg, last) {
+            const modal = document.getElementById('team-stat-modal');
+            const modalContent = modal.firstElementChild;
+            
+            // Populate data
+            document.getElementById('ts-team-num').textContent = team;
+            document.getElementById('ts-rank').textContent = rank;
+            document.getElementById('ts-rp').textContent = `${rp} RP`;
+            document.getElementById('ts-avg').textContent = `${avg} pts`;
+            document.getElementById('ts-last').textContent = last === 'None' ? 'N/A' : `${last} pts`;
+
+            // Display
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; // Trigger reflow for animation
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+        }
+
+        function closeTeamStats(event) {
+            const modal = document.getElementById('team-stat-modal');
+            const modalContent = modal.firstElementChild;
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); // Matches the CSS transition duration
+        }
+
+        // API Fetcher
+        async function fetchTBA(endpoint) {
+            if (!apiKey) {
+                throw new Error("Missing API Key in code. Please add it.");
+            }
+
+            const response = await fetch(`${TBA_BASE_URL}${endpoint}`, {
+                method: 'GET',
+                headers: {
+                    'X-TBA-Auth-Key': apiKey,
+                    'accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) throw new Error("Invalid API Key.");
+                if (response.status === 404) throw new Error("Data not found. Please check the team number.");
+                throw new Error(`API Error: ${response.status}`);
+            }
+
+            return await response.json();
+        }
+
+        // Main Search Handler
+        async function handleSearch(e) {
+            e.preventDefault();
+            const teamNum = teamInput.value;
+            const year = yearSelect.value;
+
+            if (!teamNum) return;
+
+            // UI Transitions
+            searchContainer.classList.remove('py-16', 'sm:py-24');
+            searchContainer.classList.add('py-6');
+            document.getElementById('hero-title').classList.add('hidden');
+            document.getElementById('hero-subtitle').classList.add('hidden');
+            document.getElementById('leaderboard-section').classList.add('hidden');
+            
+            eventPage.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+            loadingState.classList.remove('hidden');
+            loadingState.classList.add('flex');
+            dataContent.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                // Fetch basic team info
+                const teamData = await fetchTBA(`/team/frc${teamNum}`);
+                currentTeamNum = teamNum;
+                
+                // Fetch events for the year
+                const eventsData = await fetchTBA(`/team/frc${teamNum}/events/${year}`);
+                
+                // Fetch statuses for those events to get rankings and W/L records
+                const eventStatuses = {};
+                
+                // We fetch statuses in parallel to save time
+                const statusPromises = eventsData.map(async (event) => {
+                    try {
+                        const status = await fetchTBA(`/team/frc${teamNum}/event/${event.key}/status`);
+                        eventStatuses[event.key] = status;
+                    } catch (err) {
+                        eventStatuses[event.key] = null; // No status available
+                    }
+                });
+                
+                await Promise.all(statusPromises);
+
+                renderData(teamData, eventsData, eventStatuses, year);
+
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function showError(msg) {
+            loadingState.classList.add('hidden');
+            loadingState.classList.remove('flex');
+            errorMessage.classList.remove('hidden');
+            errorText.textContent = msg;
+        }
+
+        function renderData(team, events, statuses, year) {
+            // Hide Loader
+            loadingState.classList.add('hidden');
+            loadingState.classList.remove('flex');
+            dataContent.classList.remove('hidden');
+
+            // --- Team Header ---
+            const displayTeamName = team.nickname || team.name;
+            document.getElementById('display-team-num').textContent = team.team_number;
+            document.getElementById('display-team-name').textContent = displayTeamName;
+            document.getElementById('team-rookie-year').textContent = `Est. ${team.rookie_year}`;
+            document.getElementById('display-location').textContent = `${team.city}, ${team.state_prov}, ${team.country}`;
+            
+            // Check if this is the saved team
+            const savedTeam = localStorage.getItem('botanalyze_my_team');
+            const starIcon = document.getElementById('star-icon');
+            if (savedTeam === String(team.team_number)) {
+                starIcon.classList.remove('text-gray-400', 'dark:text-slate-400');
+                starIcon.classList.add('text-yellow-500', 'dark:text-yellow-400');
+            } else {
+                starIcon.classList.remove('text-yellow-500', 'dark:text-yellow-400');
+                starIcon.classList.add('text-gray-400', 'dark:text-slate-400');
+            }
+            
+            const webBtn = document.getElementById('team-website');
+            if (team.website) {
+                let url = team.website;
+                if(!url.startsWith('http')) url = 'https://' + url;
+                webBtn.href = url;
+                webBtn.classList.remove('hidden');
+                webBtn.classList.add('inline-flex');
+            } else {
+                webBtn.classList.add('hidden');
+            }
+
+            // --- Events Section ---
+            document.getElementById('display-year').textContent = year;
+            document.getElementById('event-count').textContent = `${events.length} Events`;
+            
+            const eventsContainer = document.getElementById('events-container');
+            eventsContainer.innerHTML = ''; // clear old
+            
+            // Sort events by date
+            events.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+            let totalWins = 0, totalLosses = 0, totalTies = 0;
+
+            if (events.length === 0) {
+                eventsContainer.innerHTML = `
+                    <div class="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center text-gray-500 dark:text-slate-400 text-lg transition-colors">
+                        No events found for Team ${team.team_number} in ${year}.
+                    </div>
+                `;
+            }
+
+            events.forEach(event => {
+                const status = statuses[event.key];
+                let rankStr = 'N/A';
+                let recordStr = '-';
+                let wltClass = 'text-gray-500 dark:text-slate-400';
+
+                if (status && status.qual) {
+                    if (status.qual.ranking) {
+                        rankStr = `Rank ${status.qual.ranking.rank} / ${status.qual.num_teams}`;
+                        const record = status.qual.ranking.record;
+                        if(record) {
+                            recordStr = `${record.wins}-${record.losses}-${record.ties}`;
+                            totalWins += record.wins;
+                            totalLosses += record.losses;
+                            totalTies += record.ties;
+                            
+                            if (record.wins > record.losses) wltClass = 'text-green-600 dark:text-green-400';
+                            else if (record.losses > record.wins) wltClass = 'text-red-600 dark:text-red-400';
+                            else wltClass = 'text-yellow-600 dark:text-yellow-400';
+                        }
+                    }
+                }
+
+                // Playoff status
+                let playoffStr = '';
+                if(status && status.playoff) {
+                    const po = status.playoff;
+                    playoffStr = `<span class="inline-block px-3 py-1 bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded font-medium text-sm border border-blue-200 dark:border-blue-800 ml-2 mt-2 md:mt-0 transition-colors">
+                        ${po.status} ${po.level}
+                    </span>`;
+                }
+
+                // Format Dates
+                const dateOptions = { month: 'short', day: 'numeric' };
+                const startDate = new Date(event.start_date).toLocaleDateString(undefined, dateOptions);
+                const endDate = new Date(event.end_date).toLocaleDateString(undefined, dateOptions);
+                const dateStr = startDate === endDate ? startDate : `${startDate} - ${endDate}`;
+
+                const safeEventName = event.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+                const cardHtml = `
+                    <div class="bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6 sm:p-8 transition-colors duration-300 group cursor-pointer" onclick="openEventDetails('${event.key}', '${team.team_number}', '${safeEventName}')">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-6">
+                            <div>
+                                <div class="text-sm font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide transition-colors">${event.event_type_string} &bull; ${dateStr}</div>
+                                <h4 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-3">
+                                    ${event.name} <i class="fa-solid fa-arrow-right text-base opacity-0 group-hover:opacity-100 transition-opacity text-blue-500"></i>
+                                </h4>
+                                <div class="text-base text-gray-500 dark:text-slate-400 mt-2 transition-colors"><i class="fa-solid fa-map-pin mr-2"></i> ${event.city}, ${event.state_prov}</div>
+                            </div>
+                            
+                            <div class="flex flex-row md:flex-col items-center md:items-end gap-4 md:gap-2 bg-gray-50 dark:bg-transparent p-4 md:p-0 rounded-lg shrink-0 w-full md:w-auto mt-2 md:mt-0 transition-colors">
+                                <div class="text-sm sm:text-base font-bold text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-900 px-4 py-1.5 rounded-full border border-gray-300 dark:border-slate-600 transition-colors">
+                                    ${rankStr}
+                                </div>
+                                <div class="flex items-center flex-wrap justify-end">
+                                    <span class="text-base sm:text-lg font-black ${wltClass} transition-colors">${recordStr}</span>
+                                    ${playoffStr}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                eventsContainer.insertAdjacentHTML('beforeend', cardHtml);
+            });
+
+            // --- Sidebar Stats ---
+            document.getElementById('stat-wins').textContent = totalWins;
+            document.getElementById('stat-losses').textContent = totalLosses;
+            
+            const totalMatches = totalWins + totalLosses + totalTies;
+            const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
+            document.getElementById('stat-winrate').textContent = `${winRate}%`;
+
+            // Update local leaderboard
+            updateLeaderboard(team.team_number, displayTeamName, totalWins, totalLosses, totalTies, winRate, team.state_prov);
+        }
+
+        // --- Event Details Page Functions ---
+        async function openEventDetails(eventKey, teamNum, eventName) {
+            searchContainer.classList.add('hidden');
+            dashboard.classList.add('hidden');
+            eventPage.classList.remove('hidden');
+            window.scrollTo(0, 0);
+
+            const title = document.getElementById('event-page-title');
+            const subtitle = document.getElementById('event-page-subtitle');
+            const body = document.getElementById('event-page-body');
+
+            title.textContent = eventName;
+            subtitle.textContent = `Team ${teamNum} Match History & Predictions`;
+            
+            body.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-20">
+                    <span class="loader w-14 h-14 mb-6"></span>
+                    <p class="text-lg text-gray-500 dark:text-slate-400 animate-pulse text-center px-4">Calculating advanced stats and predictions...</p>
+                </div>
+            `;
+
+            try {
+                // Fetch ALL matches and rankings for the event
+                const [allMatches, rankingsData] = await Promise.all([
+                    fetchTBA(`/event/${eventKey}/matches`),
+                    fetchTBA(`/event/${eventKey}/rankings`).catch(() => null) // Fails gracefully if no rankings yet
+                ]);
+                
+                eventRankings = rankingsData && rankingsData.rankings ? rankingsData.rankings : [];
+
+                // We must sort ALL matches chronologically before calculating stats to build an accurate match history
+                const compLevelOrder = { qm: 1, ef: 2, qf: 3, sf: 4, f: 5 };
+                allMatches.sort((a, b) => {
+                    if (compLevelOrder[a.comp_level] !== compLevelOrder[b.comp_level]) {
+                        return compLevelOrder[a.comp_level] - compLevelOrder[b.comp_level];
+                    }
+                    if (a.set_number !== b.set_number) return a.set_number - b.set_number;
+                    return a.match_number - b.match_number;
+                });
+
+                calculateEventStats(allMatches);
+
+                // Filter to only this team's matches for display
+                const teamMatches = allMatches.filter(m => 
+                    m.alliances.red.team_keys.includes(`frc${teamNum}`) || 
+                    m.alliances.blue.team_keys.includes(`frc${teamNum}`)
+                );
+
+                renderEventMatches(teamMatches, teamNum, body);
+            } catch (err) {
+                body.innerHTML = `
+                    <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-6 py-4 rounded-lg text-center mx-4 sm:mx-0 text-lg transition-colors">
+                        <i class="fa-solid fa-circle-exclamation mr-2"></i> Error loading match data: ${err.message}
+                    </div>`;
+            }
+        }
+
+        // Calculates running stats and builds an ordered history array for each team
+        function calculateEventStats(matches) {
+            eventStats = {};
+            matches.forEach(m => {
+                const isPlayed = m.score_breakdown && (m.alliances.red.score !== -1 || m.alliances.blue.score !== -1);
+
+                ['red', 'blue'].forEach(color => {
+                    const bd = isPlayed ? m.score_breakdown[color] : null;
+                    let auto = isPlayed ? (bd.autoPoints || bd.auto_points || 0) : 0;
+                    let teleop = isPlayed ? (bd.teleopPoints || bd.teleop_points || 0) : 0;
+                    let total = isPlayed ? m.alliances[color].score : 0;
+                    
+                    // Fallback estimate if specific breakdowns are missing
+                    if (isPlayed && auto === 0 && teleop === 0 && total > 0) {
+                        auto = total * 0.3;
+                        teleop = total * 0.7;
+                    }
+
+                    m.alliances[color].team_keys.forEach(tk => {
+                        const t = tk.replace('frc', '');
+                        if (!eventStats[t]) {
+                            eventStats[t] = { matches: 0, auto: 0, teleop: 0, total: 0, history: [] };
+                        }
+                        
+                        if (isPlayed) {
+                            eventStats[t].matches++;
+                            eventStats[t].auto += auto;
+                            eventStats[t].teleop += teleop;
+                            eventStats[t].total += total;
+                            
+                            // Log this match in the chronological history for this team
+                            eventStats[t].history.push({ key: m.key, score: total });
+                        }
+                    });
+                });
+            });
+        }
+
+        function getAvgStat(team, stat) {
+            if (!eventStats[team] || eventStats[team].matches === 0) return 0;
+            return eventStats[team][stat] / eventStats[team].matches;
+        }
+
+        function getTeamRank(team) {
+            const rankObj = eventRankings.find(r => r.team_key === `frc${team}`);
+            return rankObj ? { rank: rankObj.rank, rp: rankObj.sort_orders[0] } : { rank: 'N/A', rp: 0 };
+        }
+
+        function backToDashboard() {
+            eventPage.classList.add('hidden');
+            searchContainer.classList.remove('hidden');
+            dashboard.classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        function renderEventMatches(matches, teamNum, container) {
+            if (!matches || matches.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center text-gray-500 dark:text-slate-400 text-lg m-4 sm:m-0 transition-colors">
+                        No match schedule found for Team ${teamNum} at this event yet.
+                    </div>`;
+                return;
+            }
+
+            // Top section: Your Team's Ranking Info
+            const myRank = getTeamRank(teamNum);
+            let headerHtml = `
+                <div class="bg-gray-100 dark:bg-slate-900 sm:rounded-lg p-5 sm:p-6 mb-0 sm:mb-6 flex justify-between items-center border-b sm:border border-gray-200 dark:border-slate-700 transition-colors">
+                    <div>
+                        <div class="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Current Event Standing</div>
+                        <div class="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white transition-colors">Rank ${myRank.rank}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs sm:text-sm font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Ranking Points</div>
+                        <div class="text-3xl sm:text-4xl font-black text-blue-600 dark:text-blue-400 transition-colors">${myRank.rp} RP</div>
+                    </div>
+                </div>
+            `;
+
+            // Start of Flex Container for Matches
+            let html = headerHtml + `
+                <div class="flex flex-col sm:rounded-lg border-y sm:border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-full overflow-hidden transition-colors duration-300">
+                    <!-- Desktop Header Row (Hidden on Mobile) -->
+                    <div class="hidden sm:flex flex-row text-gray-600 dark:text-slate-400 uppercase text-sm font-bold tracking-wider bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 transition-colors">
+                        <div class="w-32 px-6 py-4 text-center">Match</div>
+                        <div class="flex-1 px-6 py-4 border-l border-gray-200 dark:border-slate-700/50 text-center">Red Alliance</div>
+                        <div class="flex-1 px-6 py-4 border-l border-gray-200 dark:border-slate-700/50 text-center">Blue Alliance</div>
+                        <div class="w-40 px-6 py-4 text-center">Result</div>
+                    </div>
+            `;
+
+            matches.forEach(m => {
+                // Strip 'frc' prefix
+                const redTeams = m.alliances.red.team_keys.map(t => t.replace('frc', ''));
+                const blueTeams = m.alliances.blue.team_keys.map(t => t.replace('frc', ''));
+                const redScore = m.alliances.red.score;
+                const blueScore = m.alliances.blue.score;
+                
+                const isMyTeamRed = redTeams.includes(String(teamNum));
+                const myAlliance = isMyTeamRed ? redTeams : blueTeams;
+                const oppAlliance = isMyTeamRed ? blueTeams : redTeams;
+
+                // Make teams clickable buttons for Mobile/Desktop popup
+                // Dynamically look backwards in the team's history to find the score BEFORE the clicked match
+                const formatTeams = (teams, isRed, currentMatchKey) => teams.map(t => {
+                    const avgPts = eventStats[t] && eventStats[t].matches > 0 ? (eventStats[t].total / eventStats[t].matches).toFixed(1) : '0.0';
+                    const rankInfo = getTeamRank(t);
+                    
+                    let lastPts = 'None';
+                    if (eventStats[t] && eventStats[t].history.length > 0) {
+                        const history = eventStats[t].history;
+                        // Find where THIS match is in their history
+                        const currentIndex = history.findIndex(h => h.key === currentMatchKey);
+                        
+                        if (currentIndex > 0) {
+                            // Fetch the score from the match right before this one
+                            lastPts = history[currentIndex - 1].score;
+                        } else if (currentIndex === -1) {
+                            // If this match isn't in history yet (hasn't been played), fetch their absolute last played match
+                            lastPts = history[history.length - 1].score;
+                        } 
+                        // If currentIndex === 0, it's their first match, so 'None' is correct.
+                    }
+                    
+                    const tooltipText = `Rank: ${rankInfo.rank} (${rankInfo.rp} RP)\nAvg Pts: ${avgPts}\nPrevious Match: ${lastPts} pts`;
+                    const onClickHandler = `showTeamStats('${t}', '${rankInfo.rank}', '${rankInfo.rp}', '${avgPts}', '${lastPts}')`;
+
+                    if (t === String(teamNum)) {
+                        return `<button type="button" onclick="${onClickHandler}" class="font-black border-b-2 ${isRed ? 'border-red-500 text-gray-900 dark:text-white' : 'border-blue-500 text-gray-900 dark:text-white'} pb-[1px] cursor-pointer outline-none shrink-0 transition-colors" title="${tooltipText}">${t}</button>`;
+                    } else {
+                        return `<button type="button" onclick="${onClickHandler}" class="font-bold opacity-90 border-b border-dotted border-gray-400 dark:border-slate-400 text-gray-700 dark:text-slate-300 cursor-pointer transition-colors hover:text-gray-900 dark:hover:text-white outline-none shrink-0" title="${tooltipText}">${t}</button>`;
+                    }
+                }).join('');
+
+                // Prediction Logic
+                let myAutoTotal = 0, myTeleopTotal = 0;
+                let oppAutoTotal = 0, oppTeleopTotal = 0;
+                
+                let myTeamListHtml = '', oppTeamListHtml = '';
+                let myTeleopListHtml = '', oppTeleopListHtml = '';
+                
+                let strongestOpponent = { team: '', teleop: -1 };
+                let weakestOppAuto = { team: '', auto: 999 };
+
+                myAlliance.forEach(t => {
+                    let a = getAvgStat(t, 'auto');
+                    let p = getAvgStat(t, 'teleop');
+                    myAutoTotal += a; myTeleopTotal += p;
+                    let label = t === String(teamNum) ? "You" : t;
+                    myTeamListHtml += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${label} averages <span class="text-gray-900 dark:text-white font-semibold">${a.toFixed(1)}</span> points<br>`;
+                    myTeleopListHtml += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${label} averages <span class="text-gray-900 dark:text-white font-semibold">${p.toFixed(1)}</span> points<br>`;
+                });
+
+                oppAlliance.forEach(t => {
+                    let a = getAvgStat(t, 'auto');
+                    let p = getAvgStat(t, 'teleop');
+                    oppAutoTotal += a; oppTeleopTotal += p;
+                    
+                    if (p > strongestOpponent.teleop) strongestOpponent = { team: t, teleop: p };
+                    if (a < weakestOppAuto.auto) weakestOppAuto = { team: t, auto: a };
+
+                    oppTeamListHtml += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${t} averages <span class="text-gray-900 dark:text-white font-semibold">${a.toFixed(1)}</span> points (Rank ${getTeamRank(t).rank})<br>`;
+                    oppTeleopListHtml += `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${t} averages <span class="text-gray-900 dark:text-white font-semibold">${p.toFixed(1)}</span> points<br>`;
+                });
+
+                const myTotalExpected = myAutoTotal + myTeleopTotal;
+                const oppTotalExpected = oppAutoTotal + oppTeleopTotal;
+                
+                let winChance = 50;
+                if (myTotalExpected + oppTotalExpected > 0) {
+                    winChance = Math.round((myTotalExpected / (myTotalExpected + oppTotalExpected)) * 100);
+                }
+                
+                let lossChance = 100 - winChance;
+                let predictedRP = winChance > 55 ? 2 : (winChance > 45 ? 1 : 0);
+
+                let strategyStr = `Assign a defensive robot to counter Team <b>${strongestOpponent.team}</b> (Avg ${strongestOpponent.teleop.toFixed(1)} teleop pts). `;
+                if (weakestOppAuto.auto < 5) {
+                    strategyStr += `Team <b>${weakestOppAuto.team}</b> struggles in Autonomous, capitalize on early points.`;
+                }
+
+                // Identify winner for display
+                let redScoreClass = redScore > blueScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
+                let blueScoreClass = blueScore > redScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
+                let scoreText = '';
+                const isPlayed = redScore !== -1 || blueScore !== -1;
+                
+                if (!isPlayed) { 
+                    scoreText = `<button onclick="toggleMatchDetails('${m.key}')" class="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs sm:text-sm font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-900/40 px-3 py-2 rounded border border-blue-200 dark:border-blue-800 flex flex-col sm:flex-row items-center justify-center gap-1 w-full sm:w-auto transition-colors">Predict <i class="fa-solid fa-chevron-down hidden sm:inline"></i></button>`;
+                } else {
+                    scoreText = `<div class="cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3 w-full group" onclick="toggleMatchDetails('${m.key}')">
+                        <div class="flex items-center whitespace-nowrap">
+                            <span class="${redScoreClass} transition-colors">${redScore}</span> 
+                            <span class="text-gray-400 dark:text-slate-600 mx-1.5 font-bold">-</span> 
+                            <span class="${blueScoreClass} transition-colors">${blueScore}</span>
+                        </div> 
+                        <i class="fa-solid fa-chevron-down text-gray-400 dark:text-slate-500 text-[10px] sm:text-sm group-hover:text-gray-900 dark:group-hover:text-white transition-colors"></i>
+                    </div>`;
+                }
+
+                const levelNames = { qm: 'Quals', ef: 'Eighths', qf: 'Quarters', sf: 'Semis', f: 'Finals' };
+                const levelName = levelNames[m.comp_level];
+                const matchNum = m.comp_level !== 'qm' ? `${m.set_number}-${m.match_number}` : m.match_number;
+                
+                const alliesStr = myAlliance.filter(t => t !== String(teamNum)).join(' and ');
+                const oppsStr = oppAlliance.join(', ');
+
+                // Main Flexible Row
+                html += `
+                    <div class="bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors flex flex-row items-stretch border-b border-gray-200 dark:border-slate-800 last:border-0 relative">
+                        
+                        <!-- Match Block -->
+                        <div class="w-[75px] sm:w-32 py-3 flex flex-col justify-center items-center text-center border-l-2 border-transparent shrink-0">
+                            <span class="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-0.5 transition-colors">${levelName}</span>
+                            <span class="text-sm sm:text-lg font-black text-gray-900 dark:text-slate-200 transition-colors">${matchNum}</span>
+                        </div>
+                        
+                        <!-- Alliances Block (Stacks on Mobile, Side-by-side on Desktop) -->
+                        <div class="flex-1 flex flex-col sm:flex-row border-l border-r border-gray-200 dark:border-slate-800 min-w-0 transition-colors">
+                            <div class="flex-1 flex items-center justify-around px-2 sm:px-6 py-2.5 sm:py-5 bg-red-50 dark:bg-red-950/10 text-red-900 dark:text-red-100 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-slate-800 text-sm sm:text-lg w-full whitespace-nowrap transition-colors">
+                                ${formatTeams(redTeams, true, m.key)}
+                            </div>
+                            <div class="flex-1 flex items-center justify-around px-2 sm:px-6 py-2.5 sm:py-5 bg-blue-50 dark:bg-blue-950/10 text-blue-900 dark:text-blue-100 text-sm sm:text-lg w-full whitespace-nowrap transition-colors">
+                                ${formatTeams(blueTeams, false, m.key)}
+                            </div>
+                        </div>
+                        
+                        <!-- Score / Predict Block -->
+                        <div class="w-[85px] sm:w-40 flex items-center justify-center font-mono text-sm sm:text-xl bg-gray-50 dark:bg-slate-900/30 p-2 sm:px-6 shrink-0 transition-colors">
+                            ${scoreText}
+                        </div>
+                    </div>
+
+                    <!-- Hidden Details / Prediction Block -->
+                    <div id="details-${m.key}" class="hidden bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 w-full transition-colors duration-300">
+                        <div class="p-5 sm:p-8 text-gray-700 dark:text-slate-300 text-sm sm:text-base leading-relaxed border-l-4 ${isMyTeamRed ? 'border-red-500' : 'border-blue-500'} transition-colors">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
+                                <div>
+                                    <p class="mb-2 text-blue-700 dark:text-blue-300"><b>Game ${m.match_number}</b> you will be teamed with ${alliesStr}.</p>
+                                    <p class="mb-5 text-red-700 dark:text-red-300">You will be competing with ${oppsStr}.</p>
+                                    
+                                    <h4 class="font-bold text-gray-900 dark:text-white text-base sm:text-lg mt-5 mb-2 border-b border-gray-200 dark:border-slate-700 pb-2 transition-colors">Autonomous:</h4>
+                                    <div class="text-gray-600 dark:text-slate-400 pl-2 transition-colors">
+                                        <b class="text-gray-800 dark:text-slate-300">Your Alliance:</b><br>
+                                        ${myTeamListHtml}
+                                        <div class="mt-2 text-gray-800 dark:text-slate-300 font-medium">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Expected Score: <span class="text-green-600 dark:text-green-400 font-bold text-base sm:text-lg">${Math.max(0, Math.round(myAutoTotal - 2))}-${Math.round(myAutoTotal + 2)} points</span></div>
+                                    </div>
+                                    <div class="text-gray-600 dark:text-slate-400 mt-4 pl-2 transition-colors">
+                                        <b class="text-gray-800 dark:text-slate-300">Opposing Alliance:</b><br>
+                                        ${oppTeamListHtml}
+                                        <div class="mt-2 text-gray-800 dark:text-slate-300 font-medium">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Expected Score: <span class="text-yellow-600 dark:text-yellow-400 font-bold text-base sm:text-lg">${Math.max(0, Math.round(oppAutoTotal - 2))}-${Math.round(oppAutoTotal + 2)} points</span></div>
+                                    </div>
+
+                                    <h4 class="font-bold text-gray-900 dark:text-white text-base sm:text-lg mt-6 mb-2 border-b border-gray-200 dark:border-slate-700 pb-2 transition-colors">Teleop:</h4>
+                                    <div class="text-gray-600 dark:text-slate-400 pl-2 transition-colors">
+                                        <b class="text-gray-800 dark:text-slate-300">Your Alliance:</b><br>
+                                        ${myTeleopListHtml}
+                                        <div class="mt-2 text-gray-800 dark:text-slate-300 font-medium">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Expected Score: <span class="text-green-600 dark:text-green-400 font-bold text-base sm:text-lg">${Math.max(0, Math.round(myTeleopTotal - 5))}-${Math.round(myTeleopTotal + 5)} points</span></div>
+                                    </div>
+                                    <div class="text-gray-600 dark:text-slate-400 mt-4 pl-2 transition-colors">
+                                        <b class="text-gray-800 dark:text-slate-300">Opposing Alliance:</b><br>
+                                        ${oppTeleopListHtml}
+                                        <div class="mt-2 text-gray-800 dark:text-slate-300 font-medium">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Expected Score: <span class="text-yellow-600 dark:text-yellow-400 font-bold text-base sm:text-lg">${Math.max(0, Math.round(oppTeleopTotal - 5))}-${Math.round(oppTeleopTotal + 5)} points</span></div>
+                                    </div>
+                                </div>
+                                <div class="bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-7 border border-gray-200 dark:border-slate-700 h-fit shadow-sm dark:shadow-lg transition-colors">
+                                    <h4 class="font-bold text-gray-900 dark:text-white text-lg sm:text-xl mb-4 flex items-center gap-3 transition-colors"><i class="fa-solid fa-chart-pie text-blue-500"></i> Match Forecast</h4>
+                                    <div class="mb-5">
+                                        <div class="flex justify-between text-sm sm:text-base mb-2">
+                                            <span class="text-green-600 dark:text-green-400 font-bold transition-colors">Win Chance: ${winChance}%</span>
+                                            <span class="text-red-600 dark:text-red-400 font-bold transition-colors">Loss Chance: ${lossChance}%</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-3 sm:h-4 transition-colors">
+                                            <div class="bg-green-500 h-3 sm:h-4 rounded-full" style="width: ${winChance}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-5">
+                                        <span class="text-gray-500 dark:text-slate-400 block text-xs sm:text-sm font-bold uppercase tracking-wider mb-1 transition-colors">Predicted RP Contribution</span>
+                                        <span class="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white transition-colors">+${predictedRP} RP</span>
+                                    </div>
+                                    <hr class="border-gray-200 dark:border-slate-600 mb-5 transition-colors">
+                                    <h4 class="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-2 transition-colors"><i class="fa-solid fa-chess-knight text-purple-500 dark:text-purple-400 mr-1"></i> Suggested Strategy</h4>
+                                    <p class="text-gray-700 dark:text-slate-300 text-sm sm:text-base italic leading-relaxed transition-colors">${strategyStr}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`; // Close Main Flex Container
+            container.innerHTML = html;
+        }
+
+        // Run Init
+        init();
+    </script>
+</body>
+</html>
