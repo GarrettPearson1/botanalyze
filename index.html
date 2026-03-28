@@ -88,8 +88,11 @@
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                             <span class="text-gray-500 font-bold text-lg">FRC</span>
                         </div>
-                        <input type="number" id="team-input" placeholder="Team Number (e.g. 254)" required min="1"
+                        <input type="text" id="team-input" placeholder="Team # or Name (e.g. 254 or Cheesy Poofs)" required autocomplete="off"
                             class="block w-full pl-14 pr-4 py-4 border border-gray-300 dark:border-slate-700 rounded-lg text-lg leading-5 bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        
+                        <!-- Main Search Autocomplete Dropdown -->
+                        <ul id="search-autocomplete" class="absolute z-50 w-full bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto hidden top-full mt-1 text-left divide-y divide-gray-100 dark:divide-slate-700"></ul>
                     </div>
                     
                     <select id="year-select" class="w-full sm:w-auto block pl-4 pr-10 py-4 border border-gray-300 dark:border-slate-700 rounded-lg text-lg leading-5 bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
@@ -120,7 +123,11 @@
 
                             <span id="tracker-error" class="hidden text-xs font-bold transition-colors"></span>
                             <form id="tracker-add-form" onsubmit="handleAddTrackedTeam(event)" class="flex items-center gap-2 w-full sm:w-auto">
-                                <input type="number" id="tracker-add-input" placeholder="Team #" required min="1" class="w-full sm:w-28 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                                <div class="relative w-full sm:w-auto">
+                                    <input type="text" id="tracker-add-input" placeholder="Team # or Name" required autocomplete="off" class="w-full sm:w-48 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                                    <!-- Tracker Add Autocomplete Dropdown -->
+                                    <ul id="tracker-autocomplete" class="absolute z-50 w-full sm:w-64 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto hidden top-full mt-1 text-left divide-y divide-gray-100 dark:divide-slate-700 right-0 sm:right-auto"></ul>
+                                </div>
                                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-bold transition-colors shadow-sm">Add</button>
                             </form>
                         </div>
@@ -302,10 +309,8 @@
         let eventStats = {}; 
         let eventRankings = []; 
         let currentTeamNameStr = '';
-        
-        // Compare State
-        let isCompareMode = false;
-        let selectedForCompare = [];
+        let selectedForCompare = []; // Stores team numbers selected via checkbox
+        let loadedTeams = []; // Cache of all teams for the selected year
         
         // DOM Elements
         const searchForm = document.getElementById('search-form');
@@ -332,6 +337,108 @@
             }
         }
 
+        // --- Team Name Resolver & Autocomplete ---
+        async function ensureTeamsLoaded(year) {
+            const cacheKey = `botanalyze_teams_cache_${year}`;
+            const cached = sessionStorage.getItem(cacheKey);
+            
+            if (cached) {
+                loadedTeams = JSON.parse(cached);
+                return loadedTeams;
+            }
+
+            try {
+                // Fetch pages 0-19 (up to team 10,000) from TBA in parallel
+                const pages = Array.from({length: 20}, (_, i) => i);
+                const promises = pages.map(p => fetchTBA(`/teams/${year}/${p}/simple`).catch(() => []));
+                const results = await Promise.all(promises);
+                loadedTeams = results.flat().filter(t => t && t.team_number);
+                
+                try { sessionStorage.setItem(cacheKey, JSON.stringify(loadedTeams)); } catch(e) { }
+            } catch(e) {
+                console.error("Failed to load global team dictionary", e);
+            }
+            return loadedTeams;
+        }
+
+        function setupAutocomplete(inputId, dropdownId, onSelectCallback) {
+            const input = document.getElementById(inputId);
+            const dropdown = document.getElementById(dropdownId);
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            input.addEventListener('input', async (e) => {
+                const val = e.target.value.trim().toLowerCase();
+                if (val.length < 2) {
+                    dropdown.classList.add('hidden');
+                    return;
+                }
+
+                const year = document.getElementById('year-select').value;
+                if (loadedTeams.length === 0) await ensureTeamsLoaded(year);
+
+                const matches = loadedTeams.filter(t => 
+                    String(t.team_number).includes(val) || 
+                    (t.nickname && t.nickname.toLowerCase().includes(val)) || 
+                    (t.name && t.name.toLowerCase().includes(val))
+                ).slice(0, 10); // Show top 10 results
+
+                if (matches.length === 0) {
+                    dropdown.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">No teams found</li>`;
+                } else {
+                    dropdown.innerHTML = matches.map(t => `
+                        <li class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer transition-colors" onclick="${onSelectCallback.name}(${t.team_number}, '${inputId}', '${dropdownId}')">
+                            <div class="flex items-center gap-3">
+                                <span class="font-black text-blue-600 dark:text-blue-400 w-12">${t.team_number}</span>
+                                <span class="font-medium text-gray-900 dark:text-white truncate">${t.nickname || t.name}</span>
+                            </div>
+                        </li>
+                    `).join('');
+                }
+                dropdown.classList.remove('hidden');
+            });
+            
+            input.addEventListener('focus', () => {
+                if (input.value.trim().length >= 2 && dropdown.innerHTML !== '') {
+                    dropdown.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Globally accessible callback functions for inline onclick attributes
+        window.selectMainTeam = function(teamNum, inputId, dropdownId) {
+            document.getElementById(inputId).value = teamNum;
+            document.getElementById(dropdownId).classList.add('hidden');
+            handleSearch(new Event('submit')); 
+        };
+
+        window.selectTrackerTeam = function(teamNum, inputId, dropdownId) {
+            document.getElementById(inputId).value = teamNum;
+            document.getElementById(dropdownId).classList.add('hidden');
+            handleAddTrackedTeam(new Event('submit'));
+        };
+
+        async function resolveTeamNumber(query, year) {
+            query = String(query).trim();
+            if (/^\d+$/.test(query)) return query;
+
+            if (loadedTeams.length === 0) await ensureTeamsLoaded(year);
+            
+            const lowerQuery = query.toLowerCase();
+            
+            let match = loadedTeams.find(t => t.nickname && t.nickname.toLowerCase() === lowerQuery);
+            if (!match) match = loadedTeams.find(t => t.name && t.name.toLowerCase() === lowerQuery);
+            if (!match) match = loadedTeams.find(t => t.nickname && t.nickname.toLowerCase().includes(lowerQuery));
+            if (!match) match = loadedTeams.find(t => t.name && t.name.toLowerCase().includes(lowerQuery));
+
+            if (match) return match.team_number;
+            throw new Error(`Could not find a team matching "${query}" in ${year}. Try using their team number.`);
+        }
+
         // Initialize
         function init() {
             updateThemeIcon();
@@ -344,9 +451,17 @@
                 yearSelect.appendChild(option);
             }
 
+            // Load Dictionary in background
+            ensureTeamsLoaded(yearSelect.value);
+            setupAutocomplete('team-input', 'search-autocomplete', selectMainTeam);
+            setupAutocomplete('tracker-add-input', 'tracker-autocomplete', selectTrackerTeam);
+
+            // Load tracked teams
             loadTracker(yearSelect.value);
 
+            // Re-fetch tracker if user changes the year dropdown
             yearSelect.addEventListener('change', () => {
+                ensureTeamsLoaded(yearSelect.value);
                 if (!document.getElementById('team-tracker-section').classList.contains('hidden')) {
                     loadTracker(yearSelect.value);
                 }
@@ -688,22 +803,24 @@
             e.preventDefault();
             const input = document.getElementById('tracker-add-input');
             const errorSpan = document.getElementById('tracker-error');
-            const num = input.value.trim();
+            const rawInput = input.value.trim();
+            const year = document.getElementById('year-select').value;
             
-            if(!num) return;
+            if(!rawInput) return;
             
             input.disabled = true;
-            errorSpan.textContent = "Adding...";
+            errorSpan.textContent = isNaN(rawInput) ? "Searching..." : "Adding...";
             errorSpan.classList.remove('hidden', 'text-red-500');
             errorSpan.classList.add('text-gray-500');
             
             try {
+                const num = await resolveTeamNumber(rawInput, year);
                 const teamData = await fetchTBA(`/team/frc${num}`);
                 let tracked = getTrackedTeams();
                 if(!tracked.find(t => t.num === parseInt(num))) {
                     tracked.push({ num: parseInt(num), name: teamData.nickname || teamData.name });
                     localStorage.setItem('botanalyze_tracked_teams', JSON.stringify(tracked));
-                    loadTracker(document.getElementById('year-select').value);
+                    loadTracker(year);
                 }
                 input.value = '';
                 errorSpan.classList.add('hidden');
@@ -799,11 +916,12 @@
             return await response.json();
         }
 
+        // Main Search
         async function handleSearch(e) {
             e.preventDefault();
-            const teamNum = teamInput.value;
+            const rawInput = teamInput.value;
             const year = yearSelect.value;
-            if (!teamNum) return;
+            if (!rawInput) return;
 
             searchContainer.classList.remove('py-16', 'sm:py-24');
             searchContainer.classList.add('py-6');
@@ -819,7 +937,13 @@
             dataContent.classList.add('hidden');
             errorMessage.classList.add('hidden');
 
+            const loaderText = loadingState.querySelector('p');
+            loaderText.textContent = isNaN(rawInput) ? `Searching for "${rawInput}"...` : 'Fetching data from The Blue Alliance...';
+
             try {
+                const teamNum = await resolveTeamNumber(rawInput, year);
+                loaderText.textContent = 'Fetching data from The Blue Alliance...';
+
                 const teamData = await fetchTBA(`/team/frc${teamNum}`);
                 currentTeamNum = teamNum;
                 currentTeamNameStr = teamData.nickname || teamData.name;
