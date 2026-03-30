@@ -361,7 +361,7 @@
             return loadedTeams;
         }
 
-        function setupAutocomplete(inputId, dropdownId, onSelectCallback) {
+        function setupAutocomplete(inputId, dropdownId, onSelectCallbackName) {
             const input = document.getElementById(inputId);
             const dropdown = document.getElementById(dropdownId);
 
@@ -391,7 +391,7 @@
                     dropdown.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">No teams found</li>`;
                 } else {
                     dropdown.innerHTML = matches.map(t => `
-                        <li class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer transition-colors" onclick="${onSelectCallback.name}(${t.team_number}, '${inputId}', '${dropdownId}')">
+                        <li class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer transition-colors" onclick="${onSelectCallbackName}(${t.team_number}, '${inputId}', '${dropdownId}')">
                             <div class="flex items-center gap-3">
                                 <span class="font-black text-blue-600 dark:text-blue-400 w-12">${t.team_number}</span>
                                 <span class="font-medium text-gray-900 dark:text-white truncate">${t.nickname || t.name}</span>
@@ -410,17 +410,17 @@
         }
 
         // Globally accessible callback functions for inline onclick attributes
-        window.selectMainTeam = function(teamNum, inputId, dropdownId) {
+        function selectMainTeam(teamNum, inputId, dropdownId) {
             document.getElementById(inputId).value = teamNum;
             document.getElementById(dropdownId).classList.add('hidden');
-            handleSearch(new Event('submit')); 
-        };
+        }
+        window.selectMainTeam = selectMainTeam;
 
-        window.selectTrackerTeam = function(teamNum, inputId, dropdownId) {
+        function selectTrackerTeam(teamNum, inputId, dropdownId) {
             document.getElementById(inputId).value = teamNum;
             document.getElementById(dropdownId).classList.add('hidden');
-            handleAddTrackedTeam(new Event('submit'));
-        };
+        }
+        window.selectTrackerTeam = selectTrackerTeam;
 
         async function resolveTeamNumber(query, year) {
             query = String(query).trim();
@@ -453,8 +453,8 @@
 
             // Load Dictionary in background
             ensureTeamsLoaded(yearSelect.value);
-            setupAutocomplete('team-input', 'search-autocomplete', selectMainTeam);
-            setupAutocomplete('tracker-add-input', 'tracker-autocomplete', selectTrackerTeam);
+            setupAutocomplete('team-input', 'search-autocomplete', 'selectMainTeam');
+            setupAutocomplete('tracker-add-input', 'tracker-autocomplete', 'selectTrackerTeam');
 
             // Load tracked teams
             loadTracker(yearSelect.value);
@@ -1214,6 +1214,11 @@
                         teleop = total * 0.7;
                     }
 
+                    // Estimate individual robot contribution by dividing the alliance points by 3
+                    let teamAuto = auto / 3.0;
+                    let teamTeleop = teleop / 3.0;
+                    let teamTotal = total / 3.0;
+
                     m.alliances[color].team_keys.forEach(tk => {
                         const t = tk.replace('frc', '');
                         if (!eventStats[t]) {
@@ -1221,10 +1226,10 @@
                         }
                         if (isPlayed) {
                             eventStats[t].matches++;
-                            eventStats[t].auto += auto;
-                            eventStats[t].teleop += teleop;
-                            eventStats[t].total += total;
-                            eventStats[t].history.push({ key: m.key, score: total });
+                            eventStats[t].auto += teamAuto;
+                            eventStats[t].teleop += teamTeleop;
+                            eventStats[t].total += teamTotal;
+                            eventStats[t].history.push({ key: m.key, score: teamTotal });
                         }
                     });
                 });
@@ -1292,8 +1297,8 @@
                     if (eventStats[t] && eventStats[t].history.length > 0) {
                         const history = eventStats[t].history;
                         const currentIndex = history.findIndex(h => h.key === currentMatchKey);
-                        if (currentIndex > 0) { lastPts = history[currentIndex - 1].score; } 
-                        else if (currentIndex === -1) { lastPts = history[history.length - 1].score; } 
+                        if (currentIndex > 0) { lastPts = history[currentIndex - 1].score.toFixed(1); } 
+                        else if (currentIndex === -1) { lastPts = history[history.length - 1].score.toFixed(1); } 
                     }
                     
                     const tooltipText = `Rank: ${rankInfo.rank} (${rankInfo.rp} RP)\nAvg Pts: ${avgPts}\nPrevious Match: ${lastPts} pts`;
