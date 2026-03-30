@@ -141,7 +141,7 @@
                                     <th class="px-2 sm:px-6 py-3 font-semibold w-24">Team</th>
                                     <th class="px-4 sm:px-6 py-3 font-semibold">Name</th>
                                     <th class="px-4 sm:px-6 py-3 font-semibold text-center">Record</th>
-                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center">Win %</th>
+                                    <th class="px-4 sm:px-6 py-3 font-semibold text-center">EPA</th>
                                     <th class="px-4 sm:px-6 py-3 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -511,6 +511,13 @@
             loadTracker(yearSelect.value); 
         }
 
+        // --- Back to Dashboard Logic ---
+        function backToDashboard() {
+            document.getElementById('event-page').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
         // --- Compare Mode Logic ---
         function handleCompareBtnClick() {
             if (!isCompareMode) {
@@ -627,8 +634,8 @@
                     fetchTBA(`/team/frc${team2}/events/${year}`)
                 ]);
 
-                const t1Stats = await getAggregatedSeasonStats(team1, t1Events);
-                const t2Stats = await getAggregatedSeasonStats(team2, t2Events);
+                const t1Stats = await getAggregatedSeasonStats(team1, t1Events, year);
+                const t2Stats = await getAggregatedSeasonStats(team2, t2Events, year);
 
                 renderCompareUI(t1Info, t1Stats, t2Info, t2Stats, compareBody);
 
@@ -640,7 +647,7 @@
             }
         }
 
-        async function getAggregatedSeasonStats(teamNum, events) {
+        async function getAggregatedSeasonStats(teamNum, events, year) {
             let w = 0, l = 0, t = 0;
             const promises = events.map(async (event) => {
                 try {
@@ -658,7 +665,23 @@
             });
             const totalMatches = w + l + t;
             const winRate = totalMatches > 0 ? Math.round((w / totalMatches) * 100) : 0;
-            return { w, l, t, winRate, totalMatches, validEvents };
+
+            let epa = 0;
+            try {
+                let sbRes = await fetch(`https://api.statbotics.io/v3/team_year/${year}/${teamNum}`).catch(() => null);
+                if (!sbRes || !sbRes.ok) sbRes = await fetch(`https://api.statbotics.io/v2/team_year/${teamNum}/${year}`).catch(() => null);
+                if (sbRes && sbRes.ok) {
+                    const sbData = await sbRes.json();
+                    if (sbData) {
+                        if (sbData.epa && typeof sbData.epa.total_points === 'object') epa = sbData.epa.total_points.mean || 0;
+                        else if (typeof sbData.epa_end === 'number') epa = sbData.epa_end;
+                        else if (typeof sbData.epa === 'number') epa = sbData.epa;
+                        else if (typeof sbData.norm_epa === 'number') epa = sbData.norm_epa;
+                    }
+                }
+            } catch(e) {}
+
+            return { w, l, t, winRate, totalMatches, validEvents, epa };
         }
 
         function renderCompareUI(t1Info, t1Stats, t2Info, t2Stats, container) {
@@ -708,6 +731,7 @@
                     <div class="flex flex-col">
                         ${buildRow('Location', `${t1Info.city}, ${t1Info.state_prov}`, `${t2Info.city}, ${t2Info.state_prov}`)}
                         ${buildRow('Rookie Year', t1Info.rookie_year || 'N/A', t2Info.rookie_year || 'N/A')}
+                        ${buildRow('Statbotics EPA', t1Stats.epa > 0 ? t1Stats.epa.toFixed(1) : 'N/A', t2Stats.epa > 0 ? t2Stats.epa.toFixed(1) : 'N/A', true, t1Stats.epa, t2Stats.epa)}
                         ${buildRow('Events Played', t1Stats.validEvents, t2Stats.validEvents, true, t1Stats.validEvents, t2Stats.validEvents)}
                         ${buildRow('Total Matches', t1Stats.totalMatches, t2Stats.totalMatches, true, t1Stats.totalMatches, t2Stats.totalMatches)}
                         ${buildRow('Total Wins', t1Stats.w, t2Stats.w, true, t1Stats.w, t2Stats.w)}
@@ -720,24 +744,50 @@
 
         // --- Tracker Fetching Helper ---
         async function getTeamYearStats(teamNum, year) {
+            let stats = { w: 0, l: 0, t: 0, epa: 0, isFallback: false };
+            
             try {
-                const statuses = await fetchTBA(`/team/frc${teamNum}/events/${year}/statuses`);
-                let w = 0, l = 0, t = 0;
-                if (!statuses) return { w:0, l:0, t:0, winRate: 0 };
+                let sbRes = await fetch(`https://api.statbotics.io/v3/team_year/${year}/${teamNum}`).catch(() => null);
+                if (!sbRes || !sbRes.ok) {
+                    sbRes = await fetch(`https://api.statbotics.io/v2/team_year/${teamNum}/${year}`).catch(() => null);
+                }
                 
-                for (const key in statuses) {
-                    const status = statuses[key];
-                    if (status && status.qual && status.qual.ranking && status.qual.ranking.record) {
-                        w += status.qual.ranking.record.wins;
-                        l += status.qual.ranking.record.losses;
-                        t += status.qual.ranking.record.ties;
+                if (sbRes && sbRes.ok) {
+                    const sbData = await sbRes.json();
+                    if (sbData) {
+                        if (sbData.epa && typeof sbData.epa.total_points === 'object') stats.epa = sbData.epa.total_points.mean || 0;
+                        else if (typeof sbData.epa_end === 'number') stats.epa = sbData.epa_end;
+                        else if (typeof sbData.epa === 'number') stats.epa = sbData.epa;
+                        else if (typeof sbData.norm_epa === 'number') stats.epa = sbData.norm_epa;
                     }
                 }
-                let winRate = (w+l+t) > 0 ? Math.round((w / (w+l+t)) * 100) : 0;
-                return { w, l, t, winRate };
             } catch(e) {
-                return { w:0, l:0, t:0, winRate: 0 };
+                console.warn(`Statbotics failed for ${teamNum}`, e);
             }
+
+            try {
+                const statuses = await fetchTBA(`/team/frc${teamNum}/events/${year}/statuses`);
+                if (statuses) {
+                    for (const key in statuses) {
+                        const status = statuses[key];
+                        if (status && status.qual && status.qual.ranking && status.qual.ranking.record) {
+                            stats.w += status.qual.ranking.record.wins;
+                            stats.l += status.qual.ranking.record.losses;
+                            stats.t += status.qual.ranking.record.ties;
+                        }
+                    }
+                }
+                
+                if (stats.epa === 0) {
+                    const totalMatches = stats.w + stats.l + stats.t;
+                    stats.epa = totalMatches > 0 ? Math.round((stats.w / totalMatches) * 100) : 0;
+                    stats.isFallback = true;
+                }
+            } catch(e) {
+                console.warn(`TBA failed for ${teamNum}`, e);
+            }
+
+            return stats;
         }
 
         async function loadTracker(year) {
@@ -767,11 +817,13 @@
                 });
                 
                 let results = await Promise.all(promises);
-                results.sort((a, b) => b.winRate - a.winRate);
+                results.sort((a, b) => b.epa - a.epa);
 
                 container.innerHTML = '';
                 results.forEach(team => {
                     const isChecked = selectedForCompare.includes(team.num) ? 'checked' : '';
+                    const epaDisplay = team.isFallback ? `${team.epa}%` : parseFloat(team.epa).toFixed(1);
+                    
                     container.innerHTML += `
                         <tr class="hover:bg-gray-100 dark:hover:bg-slate-800/80 transition-colors border-b border-gray-100 dark:border-slate-800 last:border-0 cursor-pointer" onclick="handleTrackerRowClick('${team.num}')">
                             <td class="px-4 py-4 whitespace-nowrap text-center compare-col" onclick="event.stopPropagation()">
@@ -783,7 +835,7 @@
                                 ${team.w}-${team.l}-${team.t}
                             </td>
                             <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
-                                <div class="text-base sm:text-lg font-black text-green-600 dark:text-green-400">${team.winRate}%</div>
+                                <div class="text-base sm:text-lg font-black text-green-600 dark:text-green-400">${epaDisplay}</div>
                             </td>
                             <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
                                 <button onclick="removeTrackedTeam(event, ${team.num})" class="text-gray-400 hover:text-red-500 transition-colors p-2" title="Remove from Tracker">
@@ -820,7 +872,7 @@
                 if(!tracked.find(t => t.num === parseInt(num))) {
                     tracked.push({ num: parseInt(num), name: teamData.nickname || teamData.name });
                     localStorage.setItem('botanalyze_tracked_teams', JSON.stringify(tracked));
-                    loadTracker(year);
+                    loadTracker(document.getElementById('year-select').value);
                 }
                 input.value = '';
                 errorSpan.classList.add('hidden');
@@ -1293,10 +1345,53 @@
                 let lossChance = 100 - winChance;
                 let predictedRP = winChance > 55 ? 2 : (winChance > 45 ? 1 : 0);
 
-                let strategyStr = `Assign a defensive robot to counter Team <b>${strongestOpponent.team}</b> (Avg ${strongestOpponent.teleop.toFixed(1)} teleop pts). `;
-                if (weakestOppAuto.auto < 5) {
-                    strategyStr += `Team <b>${weakestOppAuto.team}</b> struggles in Autonomous, capitalize on early points.`;
-                }
+                // --- Detailed Strategy Generation ---
+                let detailedStrategyHtml = `<div class="space-y-4 text-sm sm:text-base text-gray-700 dark:text-slate-300 transition-colors">`;
+                
+                // Your Alliance
+                detailedStrategyHtml += `<div><strong class="text-blue-600 dark:text-blue-400 block mb-1">Your Alliance Strengths:</strong><ul class="list-disc pl-5 space-y-1">`;
+                myAlliance.forEach(t => {
+                    let a = getAvgStat(t, 'auto');
+                    let p = getAvgStat(t, 'teleop');
+                    let autoDesc = a >= 15 ? "Elite Auto" : (a >= 6 ? "Solid Auto" : "Weak Auto");
+                    let teleopDesc = p >= 25 ? "Heavy Teleop Scorer" : (p >= 12 ? "Consistent Teleop" : "Low Teleop/Defense");
+                    let label = t === String(teamNum) ? "<b>You</b>" : `Team ${t}`;
+                    detailedStrategyHtml += `<li>${label}: ${autoDesc} (${a.toFixed(1)} pts), ${teleopDesc} (${p.toFixed(1)} pts).</li>`;
+                });
+                detailedStrategyHtml += `</ul></div>`;
+
+                // Opposing Alliance
+                detailedStrategyHtml += `<div><strong class="text-red-600 dark:text-red-400 block mb-1">Opponent Analysis:</strong><ul class="list-disc pl-5 space-y-1">`;
+                oppAlliance.forEach(t => {
+                    let a = getAvgStat(t, 'auto');
+                    let p = getAvgStat(t, 'teleop');
+                    
+                    let threatLevel = "";
+                    if (t === strongestOpponent.team && p > 10) {
+                        threatLevel = "🎯 <b>Primary Defensive Target:</b> Shut down their teleop cycling to swing the match.";
+                    } else if (a >= 15) {
+                        threatLevel = "⚡ <b>Auto Specialist:</b> Watch out for their opening moves.";
+                    } else if (p >= 15) {
+                        threatLevel = "⚠️ <b>Secondary Scorer:</b> Keep an eye on their cycling.";
+                    } else if (p < 8 && a < 5) {
+                        threatLevel = "🛡️ <b>Support / Defense:</b> Likely to play defense or struggle to score.";
+                    } else {
+                        threatLevel = "Balanced contributor.";
+                    }
+
+                    detailedStrategyHtml += `<li><b>Team ${t}</b>: ${threatLevel} <span class="opacity-75 block sm:inline mt-0.5 sm:mt-0">(Auto: ${a.toFixed(1)}, Teleop: ${p.toFixed(1)})</span></li>`;
+                });
+                detailedStrategyHtml += `</ul></div>`;
+
+                // Overall Tactics
+                let advice = "";
+                if (myAutoTotal > oppAutoTotal + 10) advice = "You have a massive Autonomous advantage. Ensure all pre-loaded routines run flawlessly to secure an early lead.";
+                else if (oppAutoTotal > myAutoTotal + 10) advice = "Opponents dominate Autonomous. Play safe, avoid early penalties, and rely on your Teleop pacing to catch up.";
+                else if (oppTeleopTotal > myTeleopTotal && oppAlliance.includes(strongestOpponent.team)) advice = `Opponents have higher Teleop potential. Pinning down Team ${strongestOpponent.team} with dedicated defense is your clearest path to victory.`;
+                else advice = "This is a highly competitive, balanced match. Focus on clean, penalty-free cycling and coordinating endgame climbs.";
+
+                detailedStrategyHtml += `<div class="bg-gray-100 dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700 mt-2"><strong class="text-purple-600 dark:text-purple-400"><i class="fa-solid fa-lightbulb"></i> Key Tactic:</strong> ${advice}</div>`;
+                detailedStrategyHtml += `</div>`;
 
                 let redScoreClass = redScore > blueScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
                 let blueScoreClass = blueScore > redScore ? 'font-black text-gray-900 dark:text-white' : 'font-medium text-gray-500 dark:text-slate-400';
@@ -1391,8 +1486,8 @@
                                         <span class="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white transition-colors">+${predictedRP} RP</span>
                                     </div>
                                     <hr class="border-gray-200 dark:border-slate-600 mb-5 transition-colors">
-                                    <h4 class="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-2 transition-colors"><i class="fa-solid fa-chess-knight text-purple-500 dark:text-purple-400 mr-1"></i> Suggested Strategy</h4>
-                                    <p class="text-gray-700 dark:text-slate-300 text-sm sm:text-base italic leading-relaxed transition-colors">${strategyStr}</p>
+                                    <h4 class="font-bold text-gray-900 dark:text-white text-sm sm:text-base mb-4 transition-colors"><i class="fa-solid fa-chess-knight text-purple-500 dark:text-purple-400 mr-1"></i> Detailed Strategy</h4>
+                                    ${detailedStrategyHtml}
                                 </div>
                             </div>
                         </div>
