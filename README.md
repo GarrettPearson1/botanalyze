@@ -14,8 +14,7 @@ v1.3- Added Game Overview<br>
 v1.4- Added Advanced Strategy<br>
 v1.5- Added Side-by-Side Comparison<br>
 v1.6- Updated Search Bar<br>
+v1.7- Fixed Screen Update Bugs and Solo Analytics
 
 ## Future Updates
-- Fix Team Search Selection<br>
-- Fix Team Comparison Page Updater<br>
-- Recalculate Team Analytics (Divide scores by 3 because each alliance has three teams.)<br>
+Tell Me Stuff to Put Here
