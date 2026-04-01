@@ -1,6 +1,8 @@
 # BotAnalyze
 An HTML app made to analyze FRC competition data and provide predictions and comparisons between teams. <br>
 The full website can be found at [garrettpearson1.github.io/botanalyze](https://garrettpearson1.github.io/botanalyze).<br>
+##How To Use
+Search your team name or number in the search bar and click analyze. You can click on a certain event to view the games and scores. By clicking on the dropdown arrow next to a game score, you can view a detailed analitic of it. You can also compare two teams in the my team tracker.<br>
 
 <img src="Screenshots/img6.png" alt="Homepage Light" width="400" height="200"><img src="Screenshots/img5.png" alt="Homepage Dark" width="400" height="200">
 <img src="Screenshots/img4.png" alt="Team Search" width="400" height="200"><img src="Screenshots/img3.png" alt="Team Homepage" width="400" height="200">
